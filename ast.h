@@ -17,9 +17,9 @@ struct Expression : Node {
 };
 
 struct Program : Node {
-  Program() { Statements = vector<Statement *>(); }
-  Program(vector<Statement *> statements) : Statements(statements) {}
-  vector<Statement *> Statements;
+  Program() { Statements = vector<unique_ptr<Statement>>(); }
+  Program(vector<std::unique_ptr<Statement>> statements) : Statements(statements) {}
+  vector<std::unique_ptr<Statement>> Statements;
 
   string TokenLiteral() {
     if (Statements.size() > 0) {
@@ -32,7 +32,7 @@ struct Program : Node {
   string String() {
     string out = "";
 
-    for (auto s : Statements) {
+    for (auto& s : Statements) {
       out += s->String();
     }
 
@@ -55,8 +55,8 @@ struct Identifier : Expression {
 struct LetStatement : Statement {
   LetStatement(Token token) : Token(token) {}
   Token Token; // the token.LET token
-  Identifier *Name;
-  Expression *Value;
+  std::unique_ptr<Identifier> Name;
+  std::unique_ptr<Expression>Value;
 
   void statementNode() {}
 
@@ -81,7 +81,7 @@ struct LetStatement : Statement {
 struct ReturnStatement : Statement {
   ReturnStatement(Token token) : Token(token) {}
   Token Token; // the 'return' token
-  Expression *ReturnValue;
+  std::unique_ptr<Expression>ReturnValue;
   void statementNode() {}
 
   string TokenLiteral() { return Token.Literal; }
@@ -102,9 +102,9 @@ struct ReturnStatement : Statement {
 };
 
 struct ExpressionStatement : Statement {
-  ExpressionStatement(Token token) : Token(token) {}
+  ExpressionStatement(Token token) : Token(token), Expression(nullptr){}
   Token Token; // the first token of the expression
-  Expression *Expression;
+  std::unique_ptr<Expression> Expression;
 
   void statementNode() {}
 
@@ -136,7 +136,7 @@ struct PrefixExpression : Expression {
       : Token(token), Operator(operator_) {}
   Token Token;
   string Operator;
-  Expression *Right;
+  std::unique_ptr<Expression> Right;
 
   void expressionNode() {}
 
@@ -155,12 +155,12 @@ struct PrefixExpression : Expression {
 };
 
 struct InfixExpression : Expression {
-  InfixExpression(Token token, string operator_, Expression *left)
-      : Token(token), Operator(operator_), Left(left) {}
+  InfixExpression(Token token, string operator_, std::unique_ptr<Expression>left)
+      : Token(token), Operator(operator_), Left(std::move(left)) {}
   Token Token; // the operator such as + , * ,....
-  Expression *Left;
+  std::unique_ptr<Expression> Left;
   string Operator;
-  Expression *Right;
+  std::unique_ptr<Expression>Right;
 
   void expressionNode() {}
 
@@ -180,10 +180,10 @@ struct InfixExpression : Expression {
 };
 
 struct IndexExpression : Expression {
-  IndexExpression(Token token, Expression *left) : Token(token), Left(left) {}
+  IndexExpression(Token token, std::unique_ptr<Expression>left) : Token(token), Left(std::move(left) ) {}
   Token Token; // The [ token
-  Expression *Left;
-  Expression *Index;
+  std::unique_ptr<Expression>Left;   
+  std::unique_ptr<Expression>Index;
 
   void expressionNode() {}
 
@@ -215,7 +215,7 @@ struct Boolean : Expression {
 struct BlockStatement : Statement {
   BlockStatement(Token token) : Token(token) {}
   Token Token; // the '{' token
-  vector<Statement *> Statements;
+  vector<std::unique_ptr<Statement>> Statements;
 
   void statementNode() {}
 
@@ -223,7 +223,7 @@ struct BlockStatement : Statement {
 
   string String() {
     string out = "";
-    for (auto s : Statements) {
+    for (auto& s : Statements) {
       out += s->String();
     }
     return out;
@@ -233,9 +233,9 @@ struct BlockStatement : Statement {
 struct IfExpression : Expression {
   IfExpression(Token token) : Token(token) {}
   Token Token;
-  Expression *Condition;
-  BlockStatement *Consequence;
-  BlockStatement *Alternative;
+  std::unique_ptr< Expression >Condition;
+  std::unique_ptr<BlockStatement> Consequence;
+  std::unique_ptr<BlockStatement> Alternative;
 
   void expressionNode() {}
 
@@ -261,8 +261,8 @@ struct IfExpression : Expression {
 struct WhileExpression : Expression {
   WhileExpression(Token token) : Token(token) {}
   Token Token; // the while token
-  Expression *Condition;
-  BlockStatement *Body;
+  std::unique_ptr<Expression> Condition;
+  std::unique_ptr<BlockStatement> Body;
 
   void expressionNode() {}
 
@@ -282,8 +282,8 @@ struct WhileExpression : Expression {
 struct FunctionLiteral : Expression {
   FunctionLiteral(Token token) : Token(token) {}
   Token Token; // the 'func' token
-  vector<Identifier *> Parameters;
-  BlockStatement *Body;
+  vector<std::unique_ptr<Identifier>> Parameters;
+  std::unique_ptr<BlockStatement> Body;
 
   void expressionNode() {}
 
@@ -293,7 +293,7 @@ struct FunctionLiteral : Expression {
     string out = "";
 
     vector<string> params;
-    for (auto p : Parameters) {
+    for (auto& p : Parameters) {
       params.push_back(p->String());
     }
 
@@ -310,11 +310,14 @@ struct FunctionLiteral : Expression {
 };
 
 struct CallExpression : Expression {
-  CallExpression(Token token, Expression *function)
-      : Token(token), Function(function) {}
+  CallExpression(Token token, std::unique_ptr<Expression> function)
+      : Token(token)  {
+  
+      Function = std::move(function);
+  }
   Token Token;          // The '(' token
-  Expression *Function; // Identifier or FunctionLiteral
-  vector<Expression *> Arguments;
+  std::unique_ptr<Expression> Function; // Identifier or FunctionLiteral
+  vector<std::unique_ptr<Expression>> Arguments;
 
   void expressionNode() {}
 
@@ -323,7 +326,7 @@ struct CallExpression : Expression {
   string String() {
     string out = "";
     vector<string> args;
-    for (auto a : Arguments) {
+    for (auto& a : Arguments) {
       args.push_back(a->String());
     }
     out += Function->String();
@@ -352,7 +355,7 @@ struct StringLiteral : Expression {
 struct ArrayLiteral : Expression {
   ArrayLiteral(Token token) : Token(token) {}
   Token Token; // the '[' token
-  vector<Expression *> Elements;
+  vector<std::unique_ptr<Expression>> Elements;
 
   void expressionNode() {}
 
@@ -361,7 +364,7 @@ struct ArrayLiteral : Expression {
   string String() {
     string out = "";
     vector<string> elements;
-    for (auto el : Elements) {
+    for (auto& el : Elements) {
       elements.push_back(el->String());
     }
     out += "[";
@@ -377,7 +380,7 @@ struct ArrayLiteral : Expression {
 struct HashLiteral : Expression {
   HashLiteral(Token token) : Token(token) {}
   Token Token; //? the '{' token
-  map<Expression *, Expression *> Pairs;
+  map<std::unique_ptr<Expression> , std::unique_ptr<Expression>> Pairs;
 
   void expressionNode() {}
 
@@ -386,7 +389,7 @@ struct HashLiteral : Expression {
   string String() {
     string out = "";
     vector<string> pairs;
-    for (auto pair : Pairs) {
+    for (auto& pair : Pairs) {
       pairs.push_back(pair.first->String() + ":" + pair.second->String());
     }
 
