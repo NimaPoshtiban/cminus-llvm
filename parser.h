@@ -8,8 +8,9 @@
 #include "lexer.h"
 #include <format>
 #include <functional>
-typedef  function<std::unique_ptr<Expression>()> prefixParseFn;
-typedef  function<std::unique_ptr<Expression>(std::unique_ptr<Expression>)> infixParseFn;
+using prefixParseFn = std::function<std::unique_ptr<Expression>()>;
+using infixParseFn = std::function<std::unique_ptr<Expression>(std::unique_ptr<Expression>)>;
+
 
 enum class Precedence {
 	LOWEST = 0,
@@ -33,16 +34,52 @@ unordered_map<TokenType, Precedence> precedences = {
 	{LSHIFT, Precedence::PRODUCT},     {LPAREN, Precedence::CALL},
 	{LBRACKET, Precedence::INDEX} };
 
-class Parser {
+extern class Parser {
 public:
-	Parser() {
+	Parser(const std::string& input) {
 		lexer = make_unique<Lexer>();
+		lexer->input = input;
 		errors = vector<string>();
-		nextToken();
-		nextToken();
-		infixParseFns = unordered_map<TokenType, function<std::unique_ptr<Expression>(std::unique_ptr<Expression>)>>();
-		//TODO: register prefix and infix expressions
 
+		infixParseFns = std::map<TokenType, infixParseFn>();
+		registerInfix(PLUS, std::bind(&Parser::parseInfixExpression, this, std::placeholders::_1));
+		registerInfix(MINUS, std::bind(&Parser::parseInfixExpression, this, std::placeholders::_1));
+		registerInfix(MODULO, std::bind(&Parser::parseInfixExpression, this, std::placeholders::_1));
+		registerInfix(ASTERISK, std::bind(&Parser::parseInfixExpression, this, std::placeholders::_1));
+		registerInfix(RSHIFT, std::bind(&Parser::parseInfixExpression, this, std::placeholders::_1));
+		registerInfix(LSHIFT, std::bind(&Parser::parseInfixExpression, this, std::placeholders::_1));
+		registerInfix(EQ, std::bind(&Parser::parseInfixExpression, this, std::placeholders::_1));
+		registerInfix(NOT_EQ, std::bind(&Parser::parseInfixExpression, this, std::placeholders::_1));
+		registerInfix(LOGICAL_AND, std::bind(&Parser::parseInfixExpression, this, std::placeholders::_1));
+		registerInfix(LOGICAL_OR, std::bind(&Parser::parseInfixExpression, this, std::placeholders::_1));
+		registerInfix(LT, std::bind(&Parser::parseInfixExpression, this, std::placeholders::_1));
+		registerInfix(LT_EQ, std::bind(&Parser::parseInfixExpression, this, std::placeholders::_1));
+		registerInfix(GT, std::bind(&Parser::parseInfixExpression, this, std::placeholders::_1));
+		registerInfix(GT_EQ, std::bind(&Parser::parseInfixExpression, this, std::placeholders::_1));
+		registerInfix(LPAREN, std::bind(&Parser::parseCallExpression, this, std::placeholders::_1));
+		registerInfix(LBRACKET, std::bind(&Parser::parseIndexExpression, this, std::placeholders::_1));
+
+
+
+
+		prefixParseFns = std::map<TokenType, prefixParseFn>();
+		registerPrefix(LPAREN, std::bind(&Parser::parseGroupedExpression, this));
+		registerPrefix(IDENT, std::bind(&Parser::parseIdentifier, this));
+		registerPrefix(INT, std::bind(&Parser::parseIntegerLiteral, this));
+		registerPrefix(BANG, std::bind(&Parser::parsePrefixExpression, this));
+		registerPrefix(MINUS, std::bind(&Parser::parsePrefixExpression, this));
+		registerPrefix(TRUE, std::bind(&Parser::parseBoolean, this));
+		registerPrefix(FALSE, std::bind(&Parser::parseBoolean, this));
+		registerPrefix(IF, std::bind(&Parser::parseIfExpression, this));
+		registerPrefix(FUNCTION, std::bind(&Parser::parseFunctionLiteral, this));
+		registerPrefix(WHILE, std::bind(&Parser::parseWhileLoop, this));
+		registerPrefix(STRING, std::bind(&Parser::parseStringLiteral, this));
+		registerPrefix(LBRACKET, std::bind(&Parser::parseArrayLiteral, this));
+		registerPrefix(LBRACE, std::bind(&Parser::parseHashLiteral, this));
+
+
+		nextToken();
+		nextToken();
 
 	}
 	std::unique_ptr<Program> ParserProgram() {
@@ -233,7 +270,7 @@ private:
 		}
 		return identifiers;
 	}
-	std::unique_ptr<Expression> parseCallExpression(Expression* function) {
+	std::unique_ptr<Expression> parseCallExpression(std::unique_ptr<Expression> function) {
 		auto expr = std::make_unique<CallExpression>(curToken, function);
 		expr->Arguments = parseExpressionList(RPAREN);
 		return expr;
@@ -325,7 +362,7 @@ private:
 		array->Elements = parseExpressionList(RBRACKET);
 		return array;
 	}
-	std::unique_ptr<Expression>parseIndexExpression(Expression* left) {
+	std::unique_ptr<Expression>parseIndexExpression(std::unique_ptr<Expression> left) {
 		auto expr = std::make_unique<IndexExpression>(curToken, left);
 		nextToken();
 		expr->Index = parseExpression(Precedence::LOWEST);
@@ -337,18 +374,18 @@ private:
 	std::unique_ptr<Expression>parseHashLiteral() {
 		auto hash = std::make_unique<HashLiteral>(curToken);
 		hash->Pairs = map<std::unique_ptr<Expression>, std::unique_ptr<Expression>>();
-		while(peekTokenIs(RBRACE) ){
-		nextToken();
-		auto key = parseExpression(Precedence::LOWEST);
-				if(expectPeek(COLON)) {
-					return nullptr;
-				}
-				nextToken();
-				auto value = parseExpression(Precedence::LOWEST);
-				hash->Pairs[key] = std::move(value);
-				if (peekTokenIs(RBRACE) && !expectPeek(COMMA)) {
-					return nullptr;
-				}
+		while (peekTokenIs(RBRACE)) {
+			nextToken();
+			auto key = parseExpression(Precedence::LOWEST);
+			if (expectPeek(COLON)) {
+				return nullptr;
+			}
+			nextToken();
+			auto value = parseExpression(Precedence::LOWEST);
+			hash->Pairs[key] = std::move(value);
+			if (peekTokenIs(RBRACE) && !expectPeek(COMMA)) {
+				return nullptr;
+			}
 		}
 		if (!expectPeek(RBRACE)) {
 			return nullptr;
@@ -405,33 +442,7 @@ private:
 	Token curToken;
 	Token peekToken;
 	vector<string> errors;
-	unordered_map<TokenType, function<std::unique_ptr<Expression>()>> prefixParseFns;
-	unordered_map<TokenType, function<std::unique_ptr<Expression>(std::unique_ptr<Expression>)>> infixParseFns;
+	std::map<TokenType, infixParseFn> infixParseFns;
+	std::map<TokenType, prefixParseFn> prefixParseFns;
 };
 
-// unordered_map<TokenType, function<Expression *()>> prefixParseFns = {
-//{IDENT, [&]() { return parseIdentifier(); }},
-//{INT, [&]() { return parseIntegerLiteral(); }},
-//{BANG, [&]() { return parsePrefixExpression(); }},
-//{MINUS, [&]() { return parsePrefixExpression(); }},
-//{TRUE, [&]() { return parseBooleanLiteral(); }},
-//{FALSE, [&]() { return parseBooleanLiteral(); }},
-//{IF, [&]() { return parseIfExpression(); }},
-//{FUNCTION, [&]() { return parseFunctionLiteral(); }},
-//{STRING, [&]() { return parseStringLiteral(); }},
-//{LBRACKET, [&]() { return parseArrayLiteral(); }},
-//{LBRACE, [&]() { return parseHashLiteral(); }},
-//};
-// unordered_map<TokenType, function<Expression *(Expression *)>> infixParseFns
-// = { {PLUS, [&](Expression *left) { return parseInfixExpression(left); }},
-//{MINUS, [&](Expression *left) { return parseInfixExpression(left); }},
-//{ASTERISK, [&](Expression *left) { return parseInfixExpression(left); }},
-//{SLASH, [&](Expression *left) { return parseInfixExpression(left); }},
-//{LT, [&](Expression *left) { return parseInfixExpression(left); }},
-//{GT, [&](Expression *left) { return parseInfixExpression(left); }},
-//{EQ, [&](Expression *left) { return parseInfixExpression(left); }},
-//{NOT_EQ, [&](Expression *left) { return parseInfixExpression(left); }},
-//{LOGICAL_AND, [&](Expression *left) { return parseInfixExpression(left); }},
-//{LOGICAL_OR, [&](Expression *left) { return parseInfixExpression(left); }},
-//{LPAREN, [&](Expression *left) { return parseCallExpression(left); }},
-//{LBRACKET, [&](Expression *left) { return parseIndexExpression(left); }}};
