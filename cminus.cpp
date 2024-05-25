@@ -3,7 +3,8 @@
 #include <iostream>
 int main() {
 	const std::string program = R"(
-	42
+	printf("Hello Nima")
 )";
-	std::cout << "hello world";
+	Cminus cm{ program };
+	cm.exec();
 }
