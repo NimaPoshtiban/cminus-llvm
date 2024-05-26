@@ -88,7 +88,7 @@ class Lexer {
 public:
   string input;
   Lexer(const string &input = "")
-      : input(input), position(0), readPosition(0), ch(0), line(1) {
+      : input(input), position(0), readPosition(0), ch(' '), line(1) {
     readChar();
   }
 

@@ -40,18 +40,35 @@ private:
 	}
 	//TODO: implement this
 	llvm::Value* gen(std::unique_ptr<Node> exp) {
-		/*if (auto program = dynamic_cast<Program*>(exp.get()))
-		{*/
-			//llvm::Value* result;
-			//for (size_t i = 0; i < program->Statements.size(); i++)
-			//{
-			//	//result = gen(std::move(program->Statements[i]));
-			//	return result;
-			//}
-		/*}
-		else {*/
-			return builder->getInt64(7);
-		/*}*/
+		if (auto program = dynamic_cast<Program*>(exp.get()))
+		{
+			llvm::Value* result=nullptr;
+			for (size_t i = 0; i < program->Statements.size(); i++)
+			{
+				result = gen(std::move(program->Statements[i]));
+			}
+			return result;
+		}
+		else if (auto f = dynamic_cast<FunctionLiteral*>(exp.get()))
+		{
+			llvm::Value* result = nullptr;
+			if (f->Token.Literal=="printf")
+			{
+				auto printfFn = module->getFunction("printf");
+				std::vector<llvm::Value*> args{};
+				for (size_t i = 0; i < f->Parameters.size(); i++)
+				{
+					args.push_back((llvm::Value*)(f->Parameters[i].get()->Value.at(i)));
+				}
+				return builder->CreateCall(printfFn, args);
+			}
+		}
+		else if (auto let = dynamic_cast<LetStatement*>(exp.get())) {
+
+		}
+		else {
+			return builder->getInt32(0);
+		}
 	}
 
 	void saveModuleToFile(const std::string& filename) {
