@@ -19,8 +19,8 @@ struct Expression : Node {
 };
 
 struct Program : Node {
-	Program() { Statements = vector<unique_ptr<Statement>>(); }
-	vector<std::unique_ptr<Statement>> Statements;
+	Program() { Statements = vector<shared_ptr<Statement>>(); }
+	vector<std::shared_ptr<Statement>> Statements;
 
 	string TokenLiteral() {
 		if (Statements.size() > 0) {
@@ -160,7 +160,7 @@ struct PrefixExpression : Expression {
 
 struct InfixExpression : Expression {
 	InfixExpression(Token token, string operator_, std::unique_ptr<Expression>left)
-		: Token(token), Operator(operator_), Left(std::move(left)) {}
+		: Token(token), Left(std::move(left)) ,Operator(operator_){}
 	Token Token; // the operator such as + , * ,....
 	std::unique_ptr<Expression> Left;
 	string Operator;
@@ -282,16 +282,19 @@ struct WhileExpression : Expression {
 		return out;
 	}
 };
-
-struct FunctionLiteral : Expression {
-	FunctionLiteral(Token token) : Token(token) {}
-	Token Token; // the 'func' token
+// i32 ident() {
+//   // something
+// }
+struct FunctionLiteral : Statement {
+	FunctionLiteral(Token token) : Type(token) {}
+	Token Type; // the 'type' token function type
+	Token ident; // function name;
 	vector<std::unique_ptr<Identifier>> Parameters;
 	std::unique_ptr<BlockStatement> Body;
 
-	void expressionNode() {}
+	void statementNode() {};
 
-	string TokenLiteral() { return Token.Literal; }
+	string TokenLiteral() { return Type.Literal; }
 
 	string String() {
 		string out = "";
@@ -308,6 +311,7 @@ struct FunctionLiteral : Expression {
 			out += ", ";
 		}
 		out += ") ";
+		out += "-> " + ident.Literal;
 		out += Body->String();
 		return out;
 	}

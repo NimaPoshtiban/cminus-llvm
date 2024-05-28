@@ -68,7 +68,15 @@ const string ELSE = "else";
 const string RETURN = "return";
 const string WHILE = "while";
 
+// types
+const string I64 = "i64";
+const string I32 = "i32";
 // language keywords
+
+inline unordered_map<string, TokenType> types = {
+    {"i64", I64}, {"i32", I32},
+};
+
 inline unordered_map<string, TokenType> keywords = {
     {"func", FUNCTION}, {"macro", MACRO},   {"let", LET},
     {"true", TRUE},     {"false", FALSE},   {"if", IF},
@@ -82,6 +90,13 @@ inline TokenType LookupIdent(const string &ident) {
     return keywords[ident];
   }
   return IDENT;
+}
+
+inline TokenType LookupType(const string& type) {
+    if (types.find(type) != types.end()) {
+        return types[type];
+    }
+    return IDENT;
 }
 
 class Lexer {
@@ -195,7 +210,11 @@ public:
     default:
       if (isLetter(ch)) {
         tok.Literal = readIdentifier();
-        tok.Type = LookupIdent(tok.Literal);
+        tok.Type = LookupType(tok.Literal);
+        if (tok.Type==IDENT)
+        {
+            tok.Type = LookupIdent(tok.Literal);
+        }
         return tok;
       } else if (isdigit(ch)) {
         tok.Type = INT;
@@ -278,6 +297,6 @@ private:
   }
 
   static bool isLetter(char ch) {
-    return isalpha(ch) || ch == '_' || ch == '$';
+    return isalpha(ch) || ch == '_' || ch == '$' || ch == '0' || ch == '1' || ch == '2' || ch == '3' || ch == '4' || ch == '5' || ch == '6' || ch == '7' || ch == '8' || ch == '9';
   }
 };

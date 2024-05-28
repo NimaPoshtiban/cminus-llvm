@@ -84,7 +84,6 @@ public:
 		registerPrefix(TRUE, std::bind(&Parser::parseBoolean, this));
 		registerPrefix(FALSE, std::bind(&Parser::parseBoolean, this));
 		registerPrefix(IF, std::bind(&Parser::parseIfExpression, this));
-		registerPrefix(FUNCTION, std::bind(&Parser::parseFunctionLiteral, this));
 		registerPrefix(WHILE, std::bind(&Parser::parseWhileLoop, this));
 		registerPrefix(STRING, std::bind(&Parser::parseStringLiteral, this));
 		registerPrefix(LBRACKET, std::bind(&Parser::parseArrayLiteral, this));
@@ -94,8 +93,8 @@ public:
 		nextToken();
 
 	}
-	std::unique_ptr<Program> ParserProgram() {
-		auto program = std::make_unique<Program>();
+	std::shared_ptr<Program> ParserProgram() {
+		auto program = std::make_shared<Program>();
 		while (curToken.Type.compare(EOF_TOKEN) != 0) {
 			auto statement = parseStatement();
 			if (statement != nullptr) {
@@ -103,7 +102,7 @@ public:
 			}
 			nextToken();
 		}
-		return std::move(program);
+		return program;
 	}
 
 private:
@@ -112,13 +111,17 @@ private:
 		peekToken = lexer->NextToken();
 	}
 	std::unique_ptr<Statement> parseStatement() {
+		if (LookupType(curToken.Type).compare(IDENT)!=0)
+		{
+			return parseFunctionLiteral();
+		}
 		if (curToken.Type.compare(LET) == 0) {
-			return std::move(parseLetStatement());
+			return parseLetStatement();
 		}
 		else if (curToken.Type.compare(RETURN) == 0) {
-			return std::move(parseReturnStatment());
+			return parseReturnStatment();
 		}
-		return std::move(parseExpressionStatement());
+		return parseExpressionStatement();
 	}
 	std::unique_ptr<Identifier> parseIdentifier() {
 		auto ident = std::make_unique<Identifier>(curToken, curToken.Literal);
@@ -192,7 +195,7 @@ private:
 		return std::move(lit);
 	}
 	std::unique_ptr<Expression> parseBoolean() {
-		return std::move(std::make_unique<Boolean>(curToken, curTokenIs(TRUE)));
+		return std::make_unique<Boolean>(curToken, curTokenIs(TRUE));
 	}
 
 	std::unique_ptr<Expression> parsePrefixExpression() {
@@ -243,8 +246,13 @@ private:
 		return std::move(expr);
 	}
 
-	std::unique_ptr<Expression> parseFunctionLiteral() {
+	std::unique_ptr<Statement> parseFunctionLiteral() {
 		auto lit = std::make_unique<FunctionLiteral>(curToken);
+		if (!expectPeek(IDENT))
+		{
+			return nullptr;
+		}
+		lit->ident = curToken;
 		if (!expectPeek(LPAREN)) {
 			return nullptr;
 		}
@@ -290,12 +298,12 @@ private:
 		}
 
 		nextToken();
-		args.push_back(std::move(parseExpression(Precedence::LOWEST)));
+		args.push_back(parseExpression(Precedence::LOWEST));
 
 		while (peekTokenIs(COMMA)) {
 			nextToken();
 			nextToken();
-			args.push_back(std::move(parseExpression(Precedence::LOWEST)));
+			args.push_back(parseExpression(Precedence::LOWEST));
 		}
 
 		if (!expectPeek(RPAREN)) {
@@ -354,7 +362,7 @@ private:
 		return std::move(block);
 	}
 	std::unique_ptr<Expression> parseStringLiteral() {
-		return std::move(std::make_unique<StringLiteral>(curToken, curToken.Literal));
+		return std::make_unique<StringLiteral>(curToken, curToken.Literal);
 	}
 	std::unique_ptr<Expression> parseArrayLiteral() {
 		auto array = std::make_unique<ArrayLiteral>(curToken);
@@ -394,7 +402,7 @@ private:
 		return std::move(hash);
 	}
 
-	Precedence peekPrecedence() {
+	Precedence peekPrecedence() const {
 		unordered_map<TokenType, Precedence>::const_iterator found =
 			precedences.find(peekToken.Type);
 		if (found == precedences.end()) {
@@ -402,7 +410,7 @@ private:
 		}
 		return found->second;
 	}
-	Precedence curPrecedence() {
+	Precedence curPrecedence() const {
 		unordered_map<TokenType, Precedence>::const_iterator found =
 			precedences.find(curToken.Type);
 		if (found == precedences.end()) {

@@ -7,15 +7,17 @@
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/Verifier.h"
 #include <variant>
+#include "src/Environment.h"
 class Cminus {
 public:
 	Cminus(const std::string& input) :parser(std::make_unique<Parser>(input)) {
 		moduleInit();
 		setupExternalFunctions();
+		setupGlobalEnvironment();
 	}
 	void exec() {
 		auto ast = parser->ParserProgram();
-		compile(std::move(ast));
+		compile(ast);
 		module->print(llvm::outs(), nullptr);
 		saveModuleToFile("./out.ll");
 	}
@@ -31,18 +33,65 @@ private:
 			/* format arg char*/builder->getInt8Ty()->getPointerTo(),
 			/* var args*/true));
 	}
-	void compile(std::unique_ptr<Program> ast) {
+	void compile(std::shared_ptr<Program> ast) {
 		// 1. create main function
 		fn = createFunction("main", llvm::FunctionType::get(/* return type*/ builder->getInt64Ty(),/* varargs*/false));
 		// 2. compile main body
-		gen(std::move(ast));
-
+		//eval(ast,GlobalEnv);
+		for (size_t i = 0; i < ast->Statements.size(); i++)
+		{
+			eval(ast->Statements[i], GlobalEnv);
+		}
 		builder->CreateRet(builder->getInt64(0));
 	}
 	//TODO: implement this
-	llvm::Value* gen(std::unique_ptr<Node> exp) {
-		return builder->getInt32(0);
+	llvm::Value* eval(std::shared_ptr<Node> node, std::shared_ptr<Environment> env) {
+		if (dynamic_cast<ExpressionStatement*>(node.get())!=nullptr) {
+			auto expr = dynamic_cast<ExpressionStatement*>(node.get());
+			return eval(std::move(expr->Expression), env);
+		}
+		if (dynamic_cast<FunctionLiteral*>(node.get())!=nullptr)
+		{
+			auto fnLiteral = (dynamic_cast<FunctionLiteral*>(node.get()));
+			auto params = std::move(fnLiteral->Parameters);
+			auto v = vector<std::string>();
+			for (auto& p : params)
+			{
+				v.push_back(p->String());
+			}
+			auto body = std::move(fnLiteral->Body);
+			llvm::FunctionType* fnType = nullptr;
+			if (fnLiteral->Type.Literal == I32)
+			{
+				fnType = llvm::FunctionType::get(builder->getInt32Ty(), true);
+			}
+			if (fnLiteral->Type.Literal == I64)
+			{
+				fnType = llvm::FunctionType::get(builder->getInt64Ty(), true);
+			}
+			auto function = createFunction(fnLiteral->ident.Literal, fnType);
+			setFunctionArgs(function, v);
+			GlobalEnv->define(fnLiteral->ident.Literal, function);
+			return function;
+		}
+		if (dynamic_cast<CallExpression*>(node.get())!=nullptr)
+		{
+			auto fn = dynamic_cast<CallExpression*>(node.get());
+			auto function = eval(std::move(fn->Function), env);
+			if (function == nullptr)
+			{
+				return function;
+			}
+
+		}
+		if (dynamic_cast<Identifier*>(node.get()) != nullptr)
+		{
+			llvm::Value* result = evalIdentifier(node, env);
+			return builder->CreateRet(result);
+		}
+		return builder->getInt32(0);	
 	}
+
 
 	void saveModuleToFile(const std::string& filename) {
 		std::error_code error_code;
@@ -50,9 +99,15 @@ private:
 		module->print(outLL, nullptr);
 	}
 
+	void setupGlobalEnvironment() {
+		auto record = map<std::string, llvm::Value*>();
+		GlobalEnv = std::make_shared<Environment>(record, nullptr);
+		GlobalEnv->define("version", createGlobal("version", builder->getInt8Ty()->getPointerTo()));
+	}
+
 	/**
-   * creates a function
-   */
+    * creates a function
+    */
 	llvm::Function* createFunction(const std::string& fnName, llvm::FunctionType* fnType) {
 		// function prototype may already be defined
 		auto fn = module->getFunction(fnName);
@@ -63,6 +118,17 @@ private:
 		}
 		createFunctionBlock(fn);
 		return fn;
+	}
+	/*
+	* set the names of the function arguments
+	*/
+	void setFunctionArgs(llvm::Function* fn, std::vector<std::string> fnArgs) {
+		unsigned Idx = 0;
+		llvm::Function::arg_iterator AI, AE;
+		for (AI = fn->arg_begin(), AE = fn->arg_end(); AI != AE; ++AI, Idx++)
+		{
+			AI->setName(fnArgs[Idx]);
+		}
 	}
 	/**
 	* Creates function prototype (defines the function, but not the body)
@@ -77,16 +143,60 @@ private:
 		builder->SetInsertPoint(entry);
 	}
 	/**
-   * Creates a Basic Block, if fn is passed
-   * the block is appended to the parent function, otherwise
-   * the block should be later appended manually via
-   * fn->getBasicBlockList().push_back(block);
-   */
+    * Creates a Basic Block, if fn is passed
+    * the block is appended to the parent function, otherwise
+    * the block should be later appended manually via
+    * fn->getBasicBlockList().push_back(block);
+    */
 	llvm::BasicBlock* createBB(const std::string& name, llvm::Function* fn = nullptr) {
 		return llvm::BasicBlock::Create(*ctx, name, fn);
 	}
-	std::unique_ptr<Parser>parser;
+	/*
+	* Creates a Global Variable
+	* Linkage is what determines if multiple declarations
+	* of the same object refer to the same
+    * object,or to separate ones
+	* Linkage Types:
+	* ExternalLinkage -> Externally visible function.
+	* AvailableExternallyLinkage -> Available for inspection,not emission.
+	* LinkOnceAnyLinkage -> Keep one copy of function when linking(inline)
+	* LinkOnceODRLinkage -> Same, but only  eplaced by something equivalent.
+	* WeakAnyLinkage -> Keep one copy of named function when linking(weak)
+	* WeakODRLinkage  -> Same, but only replaced by something equivalent.
+	* AppendingLinkage -> Special purpose, only applies to global arrays.
+	* InternalLinkage -> Rename collisions when linking (static functions).
+	* PrivateLinkage -> Like internal, but omit from symbol table.
+	* ExternalWeakLinkage -> ExternalWeak linkage description.
+	* CommonLinkage -> Tentative definitions
+	*/
+	llvm::GlobalVariable* createGlobal(const std::string& name,llvm::Type* type) {
+		module->getOrInsertGlobal(name, type);
+		llvm::GlobalVariable* gVar = module->getNamedGlobal(name);
+		gVar->setLinkage(llvm::GlobalVariable::CommonLinkage);
+		return gVar;
+	}
 
+
+
+	llvm::Value* evalProgram(shared_ptr<Node> node, std::shared_ptr<Environment> env) {
+		llvm::Value* result = nullptr;
+		auto program = dynamic_cast<Program*>(node.get());
+		for (size_t i = 0; i < program->Statements.size(); i++)
+		{
+			result = eval(program->Statements[i], env);
+		}
+		return result;
+	}
+	llvm::Value* evalIdentifier(shared_ptr<Node> node, std::shared_ptr<Environment> env) {
+		auto ident = dynamic_cast<Identifier*>(node.get());
+		return env->lookup(ident->Value);
+	}
+
+
+	/*
+	* The pratt parser
+	*/
+	std::unique_ptr<Parser>parser;
 	/*
 	* Global LLVM Context
 	* It owns and managaes the core "global" data of llvm's core
@@ -115,4 +225,9 @@ private:
 	 */
 	std::unique_ptr<llvm::IRBuilder<>> builder;
 	llvm::Function* fn;
+	
+	/**
+    * Global Environment (symbol table).
+    */
+	std::shared_ptr<Environment> GlobalEnv;
 };

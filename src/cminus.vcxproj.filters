@@ -17,6 +17,7 @@
     </ClInclude>
     <ClInclude Include="..\cminus.h" />
     <ClInclude Include="Object.h" />
+    <ClInclude Include="Environment.h" />
   </ItemGroup>
   <ItemGroup>
     <CustomBuild Include="C:\Users\nima\tmp\cpp\cminus\CMakeLists.txt" />

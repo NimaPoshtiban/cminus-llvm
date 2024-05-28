@@ -3,7 +3,9 @@
 #include <iostream>
 int main() {
 	const std::string program = R"(
-	printf("Hello Nima")
+	version;
+	i32 hi(){
+    }
 )";
 	Cminus cm{ program };
 	cm.exec();

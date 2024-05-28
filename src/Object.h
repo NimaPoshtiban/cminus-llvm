@@ -5,6 +5,7 @@
 #include <memory>
 #include <vector>
 #include "../ast.h"
+#include "Environment.h"
 #define OBJECT_H
 
 namespace Object {
@@ -21,7 +22,6 @@ namespace Object {
 	extern const std::string HASH_OBJ_ = "HASH";
 
 	typedef std::string ObjectType;
-
 
 	class HashKey {
 	public:
@@ -165,12 +165,12 @@ namespace Object {
 	};
 
 
-	//TODO: implement this
+	
 	class Function :Object {
 	public:
 		std::vector < std::unique_ptr<Identifier>>Parameters;
 		std::unique_ptr<BlockStatement> Body;
-		//std::unique_ptr<Environment> Env;
+		std::unique_ptr<Environment> Env;
 
 
 		std::string Message;
@@ -197,9 +197,18 @@ namespace Object {
 
 	};
 
-	// implement this
 	class ReturnValue :Object {
 	public:
+		std::unique_ptr<Object> Value;
+
+
+		ObjectType Type(void) const override {
+			return RETURN_VALUE_OBJ;
+		};
+
+		std::string Inspect(void) const override {
+			return Value->Inspect();
+		};
 
 	};
 
