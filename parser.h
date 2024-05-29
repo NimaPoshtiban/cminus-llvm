@@ -79,6 +79,7 @@ public:
 		registerPrefix(LPAREN, std::bind(&Parser::parseGroupedExpression, this));
 		registerPrefix(IDENT, std::bind(&Parser::parseIdentifier, this));
 		registerPrefix(INT, std::bind(&Parser::parseIntegerLiteral, this));
+		registerPrefix(FLT, std::bind(&Parser::parseFloatLiteral, this));
 		registerPrefix(BANG, std::bind(&Parser::parsePrefixExpression, this));
 		registerPrefix(MINUS, std::bind(&Parser::parsePrefixExpression, this));
 		registerPrefix(TRUE, std::bind(&Parser::parseBoolean, this));
@@ -194,6 +195,19 @@ private:
 		}
 		return std::move(lit);
 	}
+	std::unique_ptr<FloatLiteral> parseFloatLiteral() {
+		auto lit = std::make_unique <FloatLiteral> (curToken);
+		try {
+			auto value = std::stof(curToken.Literal);
+			lit->Value = value;
+		}
+		catch (std::invalid_argument const& ex) {
+			auto msg = std::format("at line {} could not parse {} as integer",
+				lexer->GetCurrentLine(), curToken.Literal);
+			return nullptr;
+		}
+		return std::move(lit);
+	}
 	std::unique_ptr<Expression> parseBoolean() {
 		return std::make_unique<Boolean>(curToken, curTokenIs(TRUE));
 	}
@@ -245,7 +259,14 @@ private:
 		}
 		return std::move(expr);
 	}
-
+	/*
+	* syntax:
+	* type: i32,i16 etc
+	* identifier
+	* parameters
+	* example:
+	* i32 sum(i32 x,i32 y)
+	*/
 	std::unique_ptr<Statement> parseFunctionLiteral() {
 		auto lit = std::make_unique<FunctionLiteral>(curToken);
 		if (!expectPeek(IDENT))
@@ -263,20 +284,23 @@ private:
 		lit->Body = parseBlockStatement();
 		return std::move(lit);
 	}
+	// (i32 age,i1 alive)
 	std::vector<std::unique_ptr<Identifier>> parseFunctionParameters() {
 		auto identifiers = vector<std::unique_ptr<Identifier>>();
 		if (peekTokenIs(RPAREN)) {
 			nextToken();
 			return identifiers;
 		}
-		nextToken();
-		auto ident = std::make_unique<Identifier>(curToken, curToken.Literal);
+		nextToken(); // type example : i32
+		auto ident = std::make_unique<Identifier>(peekToken, peekToken.Literal,curToken.Literal);
 		identifiers.push_back(std::move(ident));
+		nextToken(); // curtoken -> identifier
 		while (peekTokenIs(COMMA)) {
-			nextToken();
-			nextToken();
-			auto ident = std::make_unique<Identifier>(curToken, curToken.Literal);
+			nextToken(); // -> comma
+			nextToken(); // -> type i32,i16 etc
+			auto ident = std::make_unique<Identifier>(peekToken, peekToken.Literal,curToken.Literal);
 			identifiers.push_back(std::move(ident));
+			nextToken();
 		}
 		if (!expectPeek(RPAREN)) {
 			identifiers.clear();

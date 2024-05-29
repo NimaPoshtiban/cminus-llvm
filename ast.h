@@ -44,9 +44,11 @@ struct Program : Node {
 
 struct Identifier : Expression {
 	Identifier(Token token, string value) : Token(token), Value(value) {}
+	Identifier(Token token, string value,TokenType type) : Token(token), Value(value),type(type) {}
+
 	Token Token; // the token.IDENT token
 	string Value;
-
+	TokenType type;  // the type of the identifier
 	void expressionNode() {}
 
 	string TokenLiteral() { return Token.Literal; }
@@ -127,6 +129,19 @@ struct IntegerLiteral : Expression {
 	IntegerLiteral(Token token, int64_t value) : Token(token), Value(value) {}
 	Token Token;
 	int64_t Value;
+
+	void expressionNode() {}
+
+	string TokenLiteral() { return Token.Literal; }
+
+	string String() { return Token.Literal; }
+};
+
+struct FloatLiteral : Expression {
+	FloatLiteral(Token token) : Token(token) {}
+	FloatLiteral(Token token, int64_t value) : Token(token), Value(value) {}
+	Token Token;
+	double Value;
 
 	void expressionNode() {}
 

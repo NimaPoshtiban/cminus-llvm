@@ -10,7 +10,6 @@ entry:
   ret ptr @version
 }
 
-define i32 @hi(...) {
+define i1 @hi(...) {
 entry:
-  ret i64 0
 }

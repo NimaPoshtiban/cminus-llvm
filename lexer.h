@@ -19,7 +19,8 @@ const string EOF_TOKEN = "EOF";
 // identifiers + literals
 const string IDENT = "IDENT"; // add , foobar ,x ,y ,...
 const string INT = "INT";     // integers
-
+const string FLT = "FLOAT";
+ 
 // Operators
 const string ASSIGN = "=";
 const string PLUS = "+";
@@ -43,6 +44,7 @@ const string LOGICAL_AND = "and";
 const string LOGICAL_OR = "or";
 
 // Delimiters
+const string DOT = ".";
 const string COMMA = ",";
 const string SEMICOLON = ";";
 const string STRING = "STRING";
@@ -71,10 +73,17 @@ const string WHILE = "while";
 // types
 const string I64 = "i64";
 const string I32 = "i32";
+const string I16 = "i16";
+const string I8 = "i8";
+const string FLOAT = "f32";
+const string DOUBLE = "f64";
+const string BOOLEAN = "i1";
+const string NONE = "None";
+const string VOID = "void";
 // language keywords
 
 inline unordered_map<string, TokenType> types = {
-    {"i64", I64}, {"i32", I32},
+    {"i64", I64}, {"i32", I32},{"i16",I16},{"i8",I8},{"void",VOID},{"f32",FLOAT},{"f64",DOUBLE},{"None",NONE},{"i1",BOOLEAN}
 };
 
 inline unordered_map<string, TokenType> keywords = {
@@ -208,19 +217,27 @@ public:
       tok.Type = EOF_TOKEN;
       break;
     default:
-      if (isLetter(ch)) {
-        tok.Literal = readIdentifier();
-        tok.Type = LookupType(tok.Literal);
-        if (tok.Type==IDENT)
-        {
-            tok.Type = LookupIdent(tok.Literal);
+        if (isdigit(ch)) {
+            tok.Literal = readNumber();
+            if (tok.Literal.find('.') != std::string::npos)
+            {
+                tok.Type = FLT;
+            }
+            else {
+                tok.Type = INT;
+            }
+            return tok;
         }
-        return tok;
-      } else if (isdigit(ch)) {
-        tok.Type = INT;
-        tok.Literal = readNumber();
-        return tok;
-      } else {
+        if (isLetter(ch)) {
+            tok.Literal = readIdentifier();
+            tok.Type = LookupType(tok.Literal);
+            if (tok.Type == IDENT)
+            {
+                tok.Type = LookupIdent(tok.Literal);
+            }
+            return tok;
+        }
+        else {
         tok = newToken(ILLEGAL, ch);
       }
       break;
@@ -275,7 +292,9 @@ private:
 
   string readNumber() {
     int startPos = position;
-    while (isdigit(ch)) {
+    short int accurance = 0;
+    while ((isdigit(ch) || ch == '.') && accurance < 2) {
+      if (ch == '.') accurance++;
       readChar();
     }
     return input.substr(startPos, position - startPos);

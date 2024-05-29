@@ -42,7 +42,6 @@ private:
 		{
 			eval(ast->Statements[i], GlobalEnv);
 		}
-		builder->CreateRet(builder->getInt64(0));
 	}
 	//TODO: implement this
 	llvm::Value* eval(std::shared_ptr<Node> node, std::shared_ptr<Environment> env) {
@@ -50,6 +49,7 @@ private:
 			auto expr = dynamic_cast<ExpressionStatement*>(node.get());
 			return eval(std::move(expr->Expression), env);
 		}
+		// implement function body 
 		if (dynamic_cast<FunctionLiteral*>(node.get())!=nullptr)
 		{
 			auto fnLiteral = (dynamic_cast<FunctionLiteral*>(node.get()));
@@ -61,6 +61,22 @@ private:
 			}
 			auto body = std::move(fnLiteral->Body);
 			llvm::FunctionType* fnType = nullptr;
+			if (fnLiteral->Type.Literal == VOID)
+			{
+				fnType = llvm::FunctionType::get(builder->getVoidTy(), true);
+			}
+			if (fnLiteral->Type.Literal == BOOLEAN)
+			{
+				fnType = llvm::FunctionType::get(builder->getInt1Ty(), true);
+			}
+			if (fnLiteral->Type.Literal == I8)
+			{
+				fnType = llvm::FunctionType::get(builder->getInt8Ty(), true);
+			}
+			if (fnLiteral->Type.Literal == I16)
+			{
+				fnType = llvm::FunctionType::get(builder->getInt16Ty(), true);
+			}
 			if (fnLiteral->Type.Literal == I32)
 			{
 				fnType = llvm::FunctionType::get(builder->getInt32Ty(), true);
@@ -69,11 +85,20 @@ private:
 			{
 				fnType = llvm::FunctionType::get(builder->getInt64Ty(), true);
 			}
+			if (fnLiteral->Type.Literal == FLOAT)
+			{
+				fnType = llvm::FunctionType::get(builder->getFloatTy(), true);
+			}
+			if (fnLiteral->Type.Literal == DOUBLE)
+			{
+				fnType = llvm::FunctionType::get(builder->getDoubleTy(), true);
+			}
 			auto function = createFunction(fnLiteral->ident.Literal, fnType);
 			setFunctionArgs(function, v);
 			GlobalEnv->define(fnLiteral->ident.Literal, function);
 			return function;
 		}
+		// implement this
 		if (dynamic_cast<CallExpression*>(node.get())!=nullptr)
 		{
 			auto fn = dynamic_cast<CallExpression*>(node.get());
