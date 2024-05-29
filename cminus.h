@@ -45,12 +45,28 @@ private:
 	}
 	//TODO: implement this
 	llvm::Value* eval(std::shared_ptr<Node> node, std::shared_ptr<Environment> env) {
-		if (dynamic_cast<ExpressionStatement*>(node.get())!=nullptr) {
+		if (dynamic_cast<ExpressionStatement*>(node.get()) != nullptr) {
 			auto expr = dynamic_cast<ExpressionStatement*>(node.get());
 			return eval(std::move(expr->Expression), env);
 		}
+		if (dynamic_cast<StringLiteral*>(node.get()) != nullptr)
+		{
+			auto str = dynamic_cast<StringLiteral*>(node.get());
+			return builder->CreateGlobalString(str->Value);
+		}
+		if (dynamic_cast<LetStatement*>(node.get()) != nullptr) {
+			auto stmt = dynamic_cast<LetStatement*>(node.get());
+			auto val = eval(std::move(stmt->Value), env);
+			if (val == nullptr)
+			{
+				return val;
+			}
+			createGlobal(stmt->Name->Value, val->getType());
+			env->define(stmt->Name->Value, val);
+		}
+
 		// implement function body 
-		if (dynamic_cast<FunctionLiteral*>(node.get())!=nullptr)
+		if (dynamic_cast<FunctionLiteral*>(node.get()) != nullptr)
 		{
 			auto fnLiteral = (dynamic_cast<FunctionLiteral*>(node.get()));
 			auto params = std::move(fnLiteral->Parameters);
@@ -99,7 +115,7 @@ private:
 			return function;
 		}
 		// implement this
-		if (dynamic_cast<CallExpression*>(node.get())!=nullptr)
+		if (dynamic_cast<CallExpression*>(node.get()) != nullptr)
 		{
 			auto fn = dynamic_cast<CallExpression*>(node.get());
 			auto function = eval(std::move(fn->Function), env);
@@ -114,7 +130,48 @@ private:
 			llvm::Value* result = evalIdentifier(node, env);
 			return builder->CreateRet(result);
 		}
-		return builder->getInt32(0);	
+		if (dynamic_cast<IntegerLiteral*>(node.get()) != nullptr) {
+			auto number = dynamic_cast<IntegerLiteral*>(node.get());
+			return builder->getInt32(number->Value);
+		}
+		if (dynamic_cast<Boolean*>(node.get()) != nullptr)
+		{
+			auto b = dynamic_cast<Boolean*>(node.get());
+			return builder->getInt1(b->Value);
+		}
+		if (dynamic_cast<PrefixExpression*>(node.get()) != nullptr) {
+			auto prefix = dynamic_cast<PrefixExpression*>(node.get());
+			auto right = eval(std::move(prefix->Right), env);
+			if (right == nullptr)
+			{
+				return right;
+			}
+			if (prefix->Operator.compare("!")==0)
+			{
+				return builder->CreateNot(right);
+			}
+			if (prefix->Operator.compare("-")==0)
+			{
+				return builder->CreateNeg(right);
+			}
+			return nullptr;
+		}
+		if (dynamic_cast<InfixExpression*>(node.get()) != nullptr)
+		{
+			auto infix = dynamic_cast<InfixExpression*>(node.get());
+			auto left = eval(std::move(infix->Left), env);
+			if (left == nullptr)
+			{
+				return left;
+			}
+			auto right = eval(std::move(infix->Right), env);
+			if (right == nullptr)
+			{
+				return right;
+			}
+			return evalInfixExpression(infix->Operator,left,right);
+		}
+		return builder->getInt32(0);
 	}
 
 
@@ -131,8 +188,8 @@ private:
 	}
 
 	/**
-    * creates a function
-    */
+	* creates a function
+	*/
 	llvm::Function* createFunction(const std::string& fnName, llvm::FunctionType* fnType) {
 		// function prototype may already be defined
 		auto fn = module->getFunction(fnName);
@@ -168,11 +225,11 @@ private:
 		builder->SetInsertPoint(entry);
 	}
 	/**
-    * Creates a Basic Block, if fn is passed
-    * the block is appended to the parent function, otherwise
-    * the block should be later appended manually via
-    * fn->getBasicBlockList().push_back(block);
-    */
+	* Creates a Basic Block, if fn is passed
+	* the block is appended to the parent function, otherwise
+	* the block should be later appended manually via
+	* fn->getBasicBlockList().push_back(block);
+	*/
 	llvm::BasicBlock* createBB(const std::string& name, llvm::Function* fn = nullptr) {
 		return llvm::BasicBlock::Create(*ctx, name, fn);
 	}
@@ -180,7 +237,7 @@ private:
 	* Creates a Global Variable
 	* Linkage is what determines if multiple declarations
 	* of the same object refer to the same
-    * object,or to separate ones
+	* object,or to separate ones
 	* Linkage Types:
 	* ExternalLinkage -> Externally visible function.
 	* AvailableExternallyLinkage -> Available for inspection,not emission.
@@ -194,7 +251,7 @@ private:
 	* ExternalWeakLinkage -> ExternalWeak linkage description.
 	* CommonLinkage -> Tentative definitions
 	*/
-	llvm::GlobalVariable* createGlobal(const std::string& name,llvm::Type* type) {
+	llvm::GlobalVariable* createGlobal(const std::string& name, llvm::Type* type) {
 		module->getOrInsertGlobal(name, type);
 		llvm::GlobalVariable* gVar = module->getNamedGlobal(name);
 		gVar->setLinkage(llvm::GlobalVariable::CommonLinkage);
@@ -217,6 +274,93 @@ private:
 		return env->lookup(ident->Value);
 	}
 
+	llvm::Value* evalInfixExpression(const std::string& op, llvm::Value* left, llvm::Value* right) {
+		if (left->getType()==right->getType())
+		{
+			if (left->getType()->isIntegerTy())
+			{
+				if (op.compare("+")==0)
+				{
+					return builder->CreateAdd(left, right);
+				}
+				if (op.compare("-")==0)
+				{
+					return builder->CreateSub(left, right);
+				}
+				if (op.compare("*") == 0)
+				{
+					return builder->CreateMul(left, right);
+				}
+				if (op.compare("/") == 0)
+				{
+					return builder->CreateSDiv(left, right);
+				}
+				if (op.compare("%") == 0)
+				{
+					return builder->CreateSRem(left, right);
+				}
+				if (op.compare("<<") == 0)
+				{
+					return builder->CreateShl(left, right);
+				}
+				if (op.compare(">>") == 0)
+				{
+					return builder->CreateLShr(left, right);
+				}
+				if (op.compare("<") == 0)
+				{
+					return builder->CreateICmpSLT(left, right);
+				}
+				if (op.compare(">") == 0)
+				{
+					return builder->CreateICmpSGT(left, right);
+				}
+				if (op.compare("==") == 0)
+				{
+					return builder->CreateICmpEQ(left, right);
+				}
+				if (op.compare("!=") == 0)
+				{
+					return builder->CreateICmpNE(left, right);
+				}
+				if (op.compare(">=") == 0)
+				{
+					return builder->CreateICmpSGE(left, right);
+				}
+				if (op.compare("<=") == 0)
+				{
+					return builder->CreateICmpSLE(left, right);
+				}
+			}
+			// string concatination
+			if (left->getType()->isPointerTy())
+			{
+				// not implemented
+			}
+			if (op.compare("or")==0)
+			{
+				return builder->CreateOr(left, right);
+			}
+			if (op.compare("and") == 0)
+			{
+				return builder->CreateAnd(left, right);
+			}
+			if (op.compare("==") == 0)
+			{
+				return builder->getInt1(left == right);
+			}
+			if (op.compare("!=") == 0)
+			{
+				return builder->getInt1(left != right);
+			}
+		}
+
+		return nullptr;
+	}
+
+	/*llvm::Value* evalExpression(shared_ptr<Node> node, std::shared_ptr<Environment> env) {
+
+	}*/
 
 	/*
 	* The pratt parser
@@ -250,9 +394,9 @@ private:
 	 */
 	std::unique_ptr<llvm::IRBuilder<>> builder;
 	llvm::Function* fn;
-	
+
 	/**
-    * Global Environment (symbol table).
-    */
+	* Global Environment (symbol table).
+	*/
 	std::shared_ptr<Environment> GlobalEnv;
 };

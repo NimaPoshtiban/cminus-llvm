@@ -172,7 +172,7 @@ private:
 			return nullptr;
 		}
 		auto leftExp = prefix->second();
-		while (peekTokenIs(SEMICOLON) && p < peekPrecedence()) {
+		while (!(peekTokenIs(SEMICOLON)) && p < peekPrecedence()) {
 			auto infix = infixParseFns.find(peekToken.Type);
 			if (infix->second == nullptr) {
 				return std::move(leftExp);
@@ -222,7 +222,7 @@ private:
 	std::unique_ptr<Expression>
 		parseInfixExpression(std::unique_ptr<Expression> left) {
 		auto expr = std::make_unique<InfixExpression>(curToken, curToken.Literal,
-			std::move(left));
+			std::move(left),nullptr);
 		auto precedence = curPrecedence();
 		nextToken();
 		expr->Right = parseExpression(precedence);

@@ -55,7 +55,6 @@ struct Identifier : Expression {
 
 	string String() { return Value; }
 };
-
 struct LetStatement : Statement {
 	LetStatement(Token token) : Token(token) {}
 	Token Token; // the token.LET token
@@ -174,8 +173,8 @@ struct PrefixExpression : Expression {
 };
 
 struct InfixExpression : Expression {
-	InfixExpression(Token token, string operator_, std::unique_ptr<Expression>left)
-		: Token(token), Left(std::move(left)) ,Operator(operator_){}
+	InfixExpression(Token token, string operator_, std::unique_ptr<Expression>left, std::unique_ptr<Expression>right)
+		: Token(token), Left(std::move(left)) ,Operator(operator_),Right(std::move(right)){}
 	Token Token; // the operator such as + , * ,....
 	std::unique_ptr<Expression> Left;
 	string Operator;
