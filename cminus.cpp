@@ -11,9 +11,12 @@ int main() {
 		let nima = 12;
 		nima
 	}
-	nima
-	123
-	12.1
+	if(b==121){
+	  let result = true;
+	}else{
+      let result = false;
+	}
+	
 	i1 hi(i32 age,i64 salary){
 	
     }

@@ -69,6 +69,37 @@ private:
 			return blockRes;
 
 		}
+		// TODO: implement nested if expressions
+		if (dynamic_cast<IfExpression*>(node.get()) != nullptr)
+		{
+			auto ifexpr = dynamic_cast<IfExpression*>(node.get());
+			auto cond = eval(std::move(ifexpr->Condition), env);
+
+			// consequence block
+			auto consequenceBlock = createBB("consequence", fn);
+			auto elseBlock = createBB("else", fn);
+			auto ifEndBlock = createBB("end", fn);
+			builder->CreateCondBr(cond, consequenceBlock, elseBlock);
+
+
+			builder->SetInsertPoint(consequenceBlock);
+			auto conseqResult = eval(std::move(ifexpr->Consequence), env);
+			builder->CreateBr(ifEndBlock);
+
+			// else branch
+
+			builder->SetInsertPoint(elseBlock);
+			auto alternativeResult = eval(std::move(ifexpr->Alternative), env);
+			builder->CreateBr(ifEndBlock);
+
+			builder->SetInsertPoint(ifEndBlock);
+
+			auto phi = builder->CreatePHI(cond->getType(), 2, "tmpif");
+			phi->addIncoming(conseqResult, consequenceBlock);
+			phi->addIncoming(alternativeResult, elseBlock);
+			return phi;
+
+		}
 		if (dynamic_cast<StringLiteral*>(node.get()) != nullptr)
 		{
 			auto str = dynamic_cast<StringLiteral*>(node.get());
@@ -82,7 +113,8 @@ private:
 				return val;
 			}
 			auto letBinding = allocateVariable(stmt->Name->Value, val->getType(), env);
-			return builder->CreateStore(val, letBinding);
+			builder->CreateStore(val, letBinding);
+			return val;
 		}
 
 		// implement function body 
@@ -90,47 +122,51 @@ private:
 		{
 			auto fnLiteral = (dynamic_cast<FunctionLiteral*>(node.get()));
 			auto params = std::move(fnLiteral->Parameters);
-			auto v = vector<std::string>();
-			for (auto& p : params)
-			{
-				v.push_back(p->String());
+			auto v = vector<llvm::Type*>(); // parameters types
+			auto names = vector<std::string>(); // parameters names
+			for (auto& p : params) {
+				v.push_back(getTypeFromIdentifier(p->type));
+			}
+			for (auto& p : params) {
+				names.push_back(p->Token.Literal);
 			}
 			auto body = std::move(fnLiteral->Body);
 			llvm::FunctionType* fnType = nullptr;
 			if (fnLiteral->Type.Literal == VOID)
 			{
-				fnType = llvm::FunctionType::get(builder->getVoidTy(), true);
+				fnType = llvm::FunctionType::get(builder->getVoidTy(), v, true);
 			}
 			if (fnLiteral->Type.Literal == BOOLEAN)
 			{
-				fnType = llvm::FunctionType::get(builder->getInt1Ty(), true);
+				fnType = llvm::FunctionType::get(builder->getInt1Ty(), v, true);
 			}
 			if (fnLiteral->Type.Literal == I8)
 			{
-				fnType = llvm::FunctionType::get(builder->getInt8Ty(), true);
+				fnType = llvm::FunctionType::get(builder->getInt8Ty(), v, true);
 			}
 			if (fnLiteral->Type.Literal == I16)
 			{
-				fnType = llvm::FunctionType::get(builder->getInt16Ty(), true);
+				fnType = llvm::FunctionType::get(builder->getInt16Ty(), v, true);
 			}
 			if (fnLiteral->Type.Literal == I32)
 			{
-				fnType = llvm::FunctionType::get(builder->getInt32Ty(), true);
+				fnType = llvm::FunctionType::get(builder->getInt32Ty(), v, true);
 			}
 			if (fnLiteral->Type.Literal == I64)
 			{
-				fnType = llvm::FunctionType::get(builder->getInt64Ty(), true);
+				fnType = llvm::FunctionType::get(builder->getInt64Ty(), v, true);
 			}
 			if (fnLiteral->Type.Literal == FLOAT)
 			{
-				fnType = llvm::FunctionType::get(builder->getFloatTy(), true);
+				fnType = llvm::FunctionType::get(builder->getFloatTy(), v, true);
 			}
 			if (fnLiteral->Type.Literal == DOUBLE)
 			{
-				fnType = llvm::FunctionType::get(builder->getDoubleTy(), true);
+				fnType = llvm::FunctionType::get(builder->getDoubleTy(), v, true);
 			}
 			auto function = createFunction(fnLiteral->ident.Literal, fnType, env);
-			setFunctionArgs(function, v);
+			setFunctionArgs(function, names);
+
 			return function;
 		}
 		// implement this
@@ -229,10 +265,8 @@ private:
 	*/
 	void setFunctionArgs(llvm::Function* fn, std::vector<std::string> fnArgs) {
 		unsigned Idx = 0;
-		llvm::Function::arg_iterator AI, AE;
-		for (AI = fn->arg_begin(), AE = fn->arg_end(); AI != AE; ++AI, ++Idx)
-		{
-			AI->setName(fnArgs[Idx]);
+		for (auto& arg : fn->args()) {
+			arg.setName(fnArgs[Idx++]);
 		}
 	}
 	/**
@@ -295,6 +329,38 @@ private:
 		return allocatedVariable;
 	}
 
+	llvm::Type* getTypeFromIdentifier(const std::string& type_) {
+		if (type_.compare(BOOLEAN) == 0)
+		{
+			return builder->getInt1Ty();
+		}
+		if (type_.compare(I8) == 0)
+		{
+			return builder->getInt8Ty();
+		}
+		if (type_.compare(I16) == 0)
+		{
+			return builder->getInt16Ty();
+		}
+		if (type_.compare(I32) == 0)
+		{
+			return builder->getInt32Ty();
+		}
+		if (type_.compare(I64) == 0)
+		{
+			return builder->getInt64Ty();
+		}
+		if (type_.compare(FLOAT) == 0)
+		{
+			return builder->getFloatTy();
+		}
+		if (type_.compare(DOUBLE) == 0)
+		{
+			return builder->getDoubleTy();
+		}
+		return nullptr;
+	}
+
 
 	llvm::Value* evalProgram(shared_ptr<Node> node, std::shared_ptr<Environment> env) {
 		llvm::Value* result = nullptr;
@@ -324,135 +390,133 @@ private:
 	}
 
 	llvm::Value* evalInfixExpression(const std::string& op, llvm::Value* left, llvm::Value* right) {
-		if (left->getType() == right->getType())
+		if (left->getType()->isIntegerTy() == right->getType()->isIntegerTy())
 		{
-			if (left->getType()->isIntegerTy())
-			{
-				if (op.compare("+") == 0)
-				{
-					return builder->CreateAdd(left, right);
-				}
-				if (op.compare("-") == 0)
-				{
-					return builder->CreateSub(left, right);
-				}
-				if (op.compare("*") == 0)
-				{
-					return builder->CreateMul(left, right);
-				}
-				if (op.compare("/") == 0)
-				{
-					return builder->CreateSDiv(left, right);
-				}
-				if (op.compare("%") == 0)
-				{
-					return builder->CreateSRem(left, right);
-				}
-				if (op.compare("<<") == 0)
-				{
-					return builder->CreateShl(left, right);
-				}
-				if (op.compare(">>") == 0)
-				{
-					return builder->CreateLShr(left, right);
-				}
-				if (op.compare("<") == 0)
-				{
-					return builder->CreateICmpSLT(left, right);
-				}
-				if (op.compare(">") == 0)
-				{
-					return builder->CreateICmpSGT(left, right);
-				}
-				if (op.compare("==") == 0)
-				{
-					return builder->CreateICmpEQ(left, right);
-				}
-				if (op.compare("!=") == 0)
-				{
-					return builder->CreateICmpNE(left, right);
-				}
-				if (op.compare(">=") == 0)
-				{
-					return builder->CreateICmpSGE(left, right);
-				}
-				if (op.compare("<=") == 0)
-				{
-					return builder->CreateICmpSLE(left, right);
-				}
-			}
-			// float operations
-			if (left->getType()->isFloatingPointTy())
-			{
-				if (op.compare("+") == 0)
-				{
-					return builder->CreateFAdd(left, right);
-				}
-				if (op.compare("-") == 0)
-				{
-					return builder->CreateFSub(left, right);
-				}
-				if (op.compare("*") == 0)
-				{
-					return builder->CreateFMul(left, right);
-				}
-				if (op.compare("/") == 0)
-				{
-					return builder->CreateFDiv(left, right);
-				}
-				if (op.compare("<") == 0)
-				{
-					return builder->CreateFCmpOLT(left, right);
-				}
-				if (op.compare(">") == 0)
-				{
-					return builder->CreateFCmpOGT(left, right);
-				}
-				if (op.compare("==") == 0)
-				{
-					return builder->CreateFCmpOEQ(left, right);
-				}
-				if (op.compare("!=") == 0)
-				{
-					return builder->CreateFCmpONE(left, right);
-				}
-				if (op.compare(">=") == 0)
-				{
-					return builder->CreateFCmpOGE(left, right);
-				}
-				if (op.compare("<=") == 0)
-				{
-					return builder->CreateFCmpOLE(left, right);
-				}
-			}
 
-
-			// string concatination
-			if (left->getType()->isPointerTy())
+			if (op.compare("+") == 0)
 			{
-				// not implemented
+				return builder->CreateAdd(left, right);
 			}
-
-			if (op.compare("or") == 0)
+			if (op.compare("-") == 0)
 			{
-				return builder->CreateOr(left, right);
+				return builder->CreateSub(left, right);
 			}
-			if (op.compare("and") == 0)
+			if (op.compare("*") == 0)
 			{
-				return builder->CreateAnd(left, right);
+				return builder->CreateMul(left, right);
+			}
+			if (op.compare("/") == 0)
+			{
+				return builder->CreateSDiv(left, right);
+			}
+			if (op.compare("%") == 0)
+			{
+				return builder->CreateSRem(left, right);
+			}
+			if (op.compare("<<") == 0)
+			{
+				return builder->CreateShl(left, right);
+			}
+			if (op.compare(">>") == 0)
+			{
+				return builder->CreateLShr(left, right);
+			}
+			if (op.compare("<") == 0)
+			{
+				return builder->CreateICmpSLT(left, right);
+			}
+			if (op.compare(">") == 0)
+			{
+				return builder->CreateICmpSGT(left, right);
 			}
 			if (op.compare("==") == 0)
 			{
-				return builder->getInt1(left == right);
+				return builder->CreateICmpEQ(left, right);
 			}
 			if (op.compare("!=") == 0)
 			{
-				return builder->getInt1(left != right);
+				return builder->CreateICmpNE(left, right);
+			}
+			if (op.compare(">=") == 0)
+			{
+				return builder->CreateICmpSGE(left, right);
+			}
+			if (op.compare("<=") == 0)
+			{
+				return builder->CreateICmpSLE(left, right);
+			}
+		}
+		// float operations
+		if (left->getType()->isFloatingPointTy() == right->getType()->isFloatingPointTy())
+		{
+			if (op.compare("+") == 0)
+			{
+				return builder->CreateFAdd(left, right);
+			}
+			if (op.compare("-") == 0)
+			{
+				return builder->CreateFSub(left, right);
+			}
+			if (op.compare("*") == 0)
+			{
+				return builder->CreateFMul(left, right);
+			}
+			if (op.compare("/") == 0)
+			{
+				return builder->CreateFDiv(left, right);
+			}
+			if (op.compare("<") == 0)
+			{
+				return builder->CreateFCmpOLT(left, right);
+			}
+			if (op.compare(">") == 0)
+			{
+				return builder->CreateFCmpOGT(left, right);
+			}
+			if (op.compare("==") == 0)
+			{
+				return builder->CreateFCmpOEQ(left, right);
+			}
+			if (op.compare("!=") == 0)
+			{
+				return builder->CreateFCmpONE(left, right);
+			}
+			if (op.compare(">=") == 0)
+			{
+				return builder->CreateFCmpOGE(left, right);
+			}
+			if (op.compare("<=") == 0)
+			{
+				return builder->CreateFCmpOLE(left, right);
 			}
 		}
 
+
+		// string concatination
+		if (left->getType()->isPointerTy())
+		{
+			// not implemented
+		}
+
+		if (op.compare("or") == 0)
+		{
+			return builder->CreateOr(left, right);
+		}
+		if (op.compare("and") == 0)
+		{
+			return builder->CreateAnd(left, right);
+		}
+		if (op.compare("==") == 0)
+		{
+			return builder->getInt1(left == right);
+		}
+		if (op.compare("!=") == 0)
+		{
+			return builder->getInt1(left != right);
+		}
 		return nullptr;
 	}
+
 
 	/*llvm::Value* evalExpression(shared_ptr<Node> node, std::shared_ptr<Environment> env) {
 
