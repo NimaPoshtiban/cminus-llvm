@@ -5,8 +5,12 @@ int main() {
 	const std::string program = R"(
 	version;
 	let b = 11 * 11
-	b
+	let salary = 5000.128 + 0.12
 	let nima = -112;
+	{
+		let nima = 12;
+		nima
+	}
 	nima
 	123
 	12.1

@@ -26,6 +26,7 @@ private:
 		ctx = std::make_unique<llvm::LLVMContext>();
 		module = std::make_unique<llvm::Module>("cminus", *ctx);
 		builder = std::make_unique<llvm::IRBuilder<>>(*ctx);
+		variableBuilder = std::make_unique<llvm::IRBuilder<>>(*ctx);
 	}
 	void setupExternalFunctions() {
 		module->getOrInsertFunction("printf", llvm::FunctionType::get(
@@ -35,7 +36,7 @@ private:
 	}
 	void compile(std::shared_ptr<Program> ast) {
 		// 1. create main function
-		fn = createFunction("main", llvm::FunctionType::get(/* return type*/ builder->getInt64Ty(),/* varargs*/false));
+		fn = createFunction("main", llvm::FunctionType::get(/* return type*/ builder->getInt64Ty(),/* varargs*/false), GlobalEnv);
 		// 2. compile main body
 		//eval(ast,GlobalEnv);
 		for (size_t i = 0; i < ast->Statements.size(); i++)
@@ -49,6 +50,25 @@ private:
 			auto expr = dynamic_cast<ExpressionStatement*>(node.get());
 			return eval(std::move(expr->Expression), env);
 		}
+		if (dynamic_cast<BlockStatement*>(node.get()) != nullptr)
+		{
+			auto block = dynamic_cast<BlockStatement*>(node.get());
+			auto blockEnv = std::make_shared<Environment>(std::map<std::string, llvm::Value*>{}, env);
+			llvm::Value* blockRes = nullptr;
+			for (auto i = 0; i < block->Statements.size(); i++)
+			{
+				auto stmt = std::move(block->Statements[i]);
+				if (dynamic_cast<ReturnStatement*>(stmt.get()) != nullptr)
+				{
+					blockRes = eval(std::move(stmt), blockEnv);
+					return blockRes;
+				}
+				blockRes = eval(std::move(stmt), blockEnv);
+			}
+			// return the last block result
+			return blockRes;
+
+		}
 		if (dynamic_cast<StringLiteral*>(node.get()) != nullptr)
 		{
 			auto str = dynamic_cast<StringLiteral*>(node.get());
@@ -61,8 +81,8 @@ private:
 			{
 				return val;
 			}
-			createGlobal(stmt->Name->Value, val->getType());
-			env->define(stmt->Name->Value, val);
+			auto letBinding = allocateVariable(stmt->Name->Value, val->getType(), env);
+			return builder->CreateStore(val, letBinding);
 		}
 
 		// implement function body 
@@ -109,9 +129,8 @@ private:
 			{
 				fnType = llvm::FunctionType::get(builder->getDoubleTy(), true);
 			}
-			auto function = createFunction(fnLiteral->ident.Literal, fnType);
+			auto function = createFunction(fnLiteral->ident.Literal, fnType, env);
 			setFunctionArgs(function, v);
-			GlobalEnv->define(fnLiteral->ident.Literal, function);
 			return function;
 		}
 		// implement this
@@ -134,6 +153,10 @@ private:
 			auto number = dynamic_cast<IntegerLiteral*>(node.get());
 			return builder->getInt32(number->Value);
 		}
+		if (dynamic_cast<FloatLiteral*>(node.get()) != nullptr) {
+			auto number = dynamic_cast<FloatLiteral*>(node.get());
+			return llvm::ConstantFP::get(builder->getDoubleTy(), number->Value);
+		}
 		if (dynamic_cast<Boolean*>(node.get()) != nullptr)
 		{
 			auto b = dynamic_cast<Boolean*>(node.get());
@@ -146,11 +169,11 @@ private:
 			{
 				return right;
 			}
-			if (prefix->Operator.compare("!")==0)
+			if (prefix->Operator.compare("!") == 0)
 			{
 				return builder->CreateNot(right);
 			}
-			if (prefix->Operator.compare("-")==0)
+			if (prefix->Operator.compare("-") == 0)
 			{
 				return builder->CreateNeg(right);
 			}
@@ -169,7 +192,7 @@ private:
 			{
 				return right;
 			}
-			return evalInfixExpression(infix->Operator,left,right);
+			return evalInfixExpression(infix->Operator, left, right);
 		}
 		return builder->getInt32(0);
 	}
@@ -184,19 +207,19 @@ private:
 	void setupGlobalEnvironment() {
 		auto record = map<std::string, llvm::Value*>();
 		GlobalEnv = std::make_shared<Environment>(record, nullptr);
-		GlobalEnv->define("version", createGlobal("version", builder->getInt8Ty()->getPointerTo()));
+		GlobalEnv->define("version", createGlobal("version", (llvm::Constant*)builder->getInt32(1)));
 	}
 
 	/**
 	* creates a function
 	*/
-	llvm::Function* createFunction(const std::string& fnName, llvm::FunctionType* fnType) {
+	llvm::Function* createFunction(const std::string& fnName, llvm::FunctionType* fnType, std::shared_ptr<Environment> env) {
 		// function prototype may already be defined
 		auto fn = module->getFunction(fnName);
 		// if not, allocate the function
 		if (fn == nullptr)
 		{
-			fn = createFunctionProto(fnName, fnType);
+			fn = createFunctionProto(fnName, fnType, env);
 		}
 		createFunctionBlock(fn);
 		return fn;
@@ -207,7 +230,7 @@ private:
 	void setFunctionArgs(llvm::Function* fn, std::vector<std::string> fnArgs) {
 		unsigned Idx = 0;
 		llvm::Function::arg_iterator AI, AE;
-		for (AI = fn->arg_begin(), AE = fn->arg_end(); AI != AE; ++AI, Idx++)
+		for (AI = fn->arg_begin(), AE = fn->arg_end(); AI != AE; ++AI, ++Idx)
 		{
 			AI->setName(fnArgs[Idx]);
 		}
@@ -215,9 +238,10 @@ private:
 	/**
 	* Creates function prototype (defines the function, but not the body)
 	*/
-	llvm::Function* createFunctionProto(const std::string& fnName, llvm::FunctionType* fnType) {
+	llvm::Function* createFunctionProto(const std::string& fnName, llvm::FunctionType* fnType, std::shared_ptr<Environment> env) {
 		auto fn = llvm::Function::Create(fnType, llvm::Function::ExternalLinkage, fnName, *module);
 		verifyFunction(*fn);
+		env->define(fnName, fn);
 		return fn;
 	}
 	void createFunctionBlock(llvm::Function* fn) {
@@ -251,13 +275,25 @@ private:
 	* ExternalWeakLinkage -> ExternalWeak linkage description.
 	* CommonLinkage -> Tentative definitions
 	*/
-	llvm::GlobalVariable* createGlobal(const std::string& name, llvm::Type* type) {
-		module->getOrInsertGlobal(name, type);
+	llvm::GlobalVariable* createGlobal(const std::string& name, llvm::Constant* init) {
+		module->getOrInsertGlobal(name, init->getType());
 		llvm::GlobalVariable* gVar = module->getNamedGlobal(name);
+		gVar->setInitializer(init);
+		gVar->setConstant(false);
 		gVar->setLinkage(llvm::GlobalVariable::CommonLinkage);
 		return gVar;
 	}
 
+	/*
+	* Allocates a variable on the stack
+	*/
+	llvm::Value* allocateVariable(const std::string& name, llvm::Type* type_, std::shared_ptr<Environment>env) {
+		variableBuilder->SetInsertPoint(&fn->getEntryBlock());
+
+		auto allocatedVariable = variableBuilder->CreateAlloca(type_, 0, name.c_str());
+		env->define(name, allocatedVariable);
+		return allocatedVariable;
+	}
 
 
 	llvm::Value* evalProgram(shared_ptr<Node> node, std::shared_ptr<Environment> env) {
@@ -271,19 +307,32 @@ private:
 	}
 	llvm::Value* evalIdentifier(shared_ptr<Node> node, std::shared_ptr<Environment> env) {
 		auto ident = dynamic_cast<Identifier*>(node.get());
-		return env->lookup(ident->Value);
+		auto value = env->lookup(ident->Value);
+
+		// local variable
+		if (auto localValue = dyn_cast<llvm::AllocaInst>(value))
+		{
+			builder->CreateLoad(localValue->getAllocatedType(), localValue, ident->Value.c_str());
+		}
+
+		// global variable
+		if (auto globalValue = dyn_cast<llvm::GlobalVariable>(value))
+		{
+			return builder->CreateLoad(globalValue->getInitializer()->getType(), globalValue, ident->Value.c_str());
+		}
+		return value;
 	}
 
 	llvm::Value* evalInfixExpression(const std::string& op, llvm::Value* left, llvm::Value* right) {
-		if (left->getType()==right->getType())
+		if (left->getType() == right->getType())
 		{
 			if (left->getType()->isIntegerTy())
 			{
-				if (op.compare("+")==0)
+				if (op.compare("+") == 0)
 				{
 					return builder->CreateAdd(left, right);
 				}
-				if (op.compare("-")==0)
+				if (op.compare("-") == 0)
 				{
 					return builder->CreateSub(left, right);
 				}
@@ -332,12 +381,59 @@ private:
 					return builder->CreateICmpSLE(left, right);
 				}
 			}
+			// float operations
+			if (left->getType()->isFloatingPointTy())
+			{
+				if (op.compare("+") == 0)
+				{
+					return builder->CreateFAdd(left, right);
+				}
+				if (op.compare("-") == 0)
+				{
+					return builder->CreateFSub(left, right);
+				}
+				if (op.compare("*") == 0)
+				{
+					return builder->CreateFMul(left, right);
+				}
+				if (op.compare("/") == 0)
+				{
+					return builder->CreateFDiv(left, right);
+				}
+				if (op.compare("<") == 0)
+				{
+					return builder->CreateFCmpOLT(left, right);
+				}
+				if (op.compare(">") == 0)
+				{
+					return builder->CreateFCmpOGT(left, right);
+				}
+				if (op.compare("==") == 0)
+				{
+					return builder->CreateFCmpOEQ(left, right);
+				}
+				if (op.compare("!=") == 0)
+				{
+					return builder->CreateFCmpONE(left, right);
+				}
+				if (op.compare(">=") == 0)
+				{
+					return builder->CreateFCmpOGE(left, right);
+				}
+				if (op.compare("<=") == 0)
+				{
+					return builder->CreateFCmpOLE(left, right);
+				}
+			}
+
+
 			// string concatination
 			if (left->getType()->isPointerTy())
 			{
 				// not implemented
 			}
-			if (op.compare("or")==0)
+
+			if (op.compare("or") == 0)
 			{
 				return builder->CreateOr(left, right);
 			}
@@ -392,6 +488,16 @@ private:
 	 * This builder always prepends to the beginning of the
 	 * function entry block.
 	 */
+	std::unique_ptr<llvm::IRBuilder<>> variableBuilder;
+
+
+	/**
+	* IR Builder.
+	*
+	* This provides a uniform API for creating instructions and inserting
+	* them into a basic block: either at the end of a BasicBlock, or at a
+	* specific iterator location in a block.
+	*/
 	std::unique_ptr<llvm::IRBuilder<>> builder;
 	llvm::Function* fn;
 
