@@ -69,7 +69,6 @@ private:
 			return blockRes;
 
 		}
-		// TODO: implement nested if expressions
 		if (dynamic_cast<IfExpression*>(node.get()) != nullptr)
 		{
 			auto ifexpr = dynamic_cast<IfExpression*>(node.get());
@@ -81,16 +80,28 @@ private:
 			auto ifEndBlock = createBB("end", fn);
 			builder->CreateCondBr(cond, consequenceBlock, elseBlock);
 
-
 			builder->SetInsertPoint(consequenceBlock);
 			auto conseqResult = eval(std::move(ifexpr->Consequence), env);
+			if (conseqResult == nullptr)
+			{
+				return nullptr;
+			}
 			builder->CreateBr(ifEndBlock);
 
+			consequenceBlock = builder->GetInsertBlock();
 			// else branch
 
+			fn->insert(fn->end(), elseBlock);
 			builder->SetInsertPoint(elseBlock);
 			auto alternativeResult = eval(std::move(ifexpr->Alternative), env);
+			if (alternativeResult == nullptr)
+			{
+				return nullptr;
+			}
 			builder->CreateBr(ifEndBlock);
+			elseBlock = builder->GetInsertBlock();
+
+			fn->insert(fn->end(), ifEndBlock);
 
 			builder->SetInsertPoint(ifEndBlock);
 

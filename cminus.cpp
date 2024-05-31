@@ -13,6 +13,7 @@ int main() {
 	}
 	if(b==121){
 	  let result = true;
+	  
 	}else{
       let result = false;
 	}

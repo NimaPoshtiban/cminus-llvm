@@ -22,20 +22,20 @@ entry:
   %b3 = load i32, ptr %b, align 4
   ret ptr %b
   %0 = fcmp oeq void <badref>, i32 121
-  br i1 %0, label %consequence, label %else
+  br i1 %0, label %consequence, label %else4
   %result = alloca i1, align 1
-  %result4 = alloca i1, align 1
+  %result5 = alloca i1, align 1
 
 consequence:                                      ; preds = %entry
   store i1 true, ptr %result, align 1
-  br label %end
+  br label %end6
 
-else:                                             ; preds = %entry
-  store i1 false, ptr %result4, align 1
-  br label %end
+else4:                                            ; preds = %entry
+  store i1 false, ptr %result5, align 1
+  br label %end6
 
-end:                                              ; preds = %else, %consequence
-  %tmpif = phi i1 [ true, %consequence ], [ false, %else ]
+end6:                                             ; preds = %else4, %consequence
+  %tmpif = phi i1 [ true, %consequence ], [ false, %else4 ]
 }
 
 define i1 @hi(i32 %age, i64 %salary, ...) {
