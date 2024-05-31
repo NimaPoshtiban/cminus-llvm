@@ -63,6 +63,7 @@ const string COLON = ":";
 const string MACRO = "macro";
 const string FUNCTION = "func";
 const string LET = "let";
+const string MUT = "mut";
 const string TRUE = "true";
 const string FALSE = "false";
 const string IF = "if";
@@ -90,7 +91,7 @@ inline unordered_map<string, TokenType> keywords = {
     {"func", FUNCTION}, {"macro", MACRO},   {"let", LET},
     {"true", TRUE},     {"false", FALSE},   {"if", IF},
     {"else", ELSE},     {"return", RETURN}, {"and", LOGICAL_AND},
-    {"or", LOGICAL_OR}, {"while", WHILE},
+    {"or", LOGICAL_OR}, {"while", WHILE},{"mut",MUT},
 };
 
 // check to see if the given identifier is a keyword

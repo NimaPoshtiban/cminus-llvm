@@ -6,16 +6,22 @@
 #include "lexer.h"
 
 struct Node {
+	Node() = default;
 	virtual string TokenLiteral() = 0;
 	virtual string String() = 0;
+	~Node() = default;
 };
 
 struct Statement : Node {
+	Statement() = default;
 	virtual void statementNode() = 0;
+	~Statement() = default;
 };
 
 struct Expression : Node {
+	Expression() = default;
 	virtual void expressionNode() = 0;
+	~Expression() = default;
 };
 
 struct Program : Node {
@@ -40,11 +46,12 @@ struct Program : Node {
 
 		return out;
 	}
+	~Program() {}
 };
 
 struct Identifier : Expression {
 	Identifier(Token token, string value) : Token(token), Value(value) {}
-	Identifier(Token token, string value,TokenType type) : Token(token), Value(value),type(type) {}
+	Identifier(Token token, string value, TokenType type) : Token(token), Value(value), type(type) {}
 
 	Token Token; // the token.IDENT token
 	string Value;
@@ -54,6 +61,7 @@ struct Identifier : Expression {
 	string TokenLiteral() { return Token.Literal; }
 
 	string String() { return Value; }
+	~Identifier() {}
 };
 struct LetStatement : Statement {
 	LetStatement(Token token) : Token(token) {}
@@ -79,7 +87,9 @@ struct LetStatement : Statement {
 
 		return out;
 	}
+	~LetStatement() {}
 };
+
 
 struct ReturnStatement : Statement {
 	ReturnStatement(Token token, std::unique_ptr<Expression>returnValue = nullptr) : Token(token) {
@@ -104,6 +114,10 @@ struct ReturnStatement : Statement {
 
 		return out;
 	}
+	~ReturnStatement()
+	{
+
+	}
 };
 
 struct ExpressionStatement : Statement {
@@ -121,6 +135,10 @@ struct ExpressionStatement : Statement {
 		}
 		return "";
 	}
+	~ExpressionStatement()
+	{
+
+	}
 };
 
 struct IntegerLiteral : Expression {
@@ -134,6 +152,10 @@ struct IntegerLiteral : Expression {
 	string TokenLiteral() { return Token.Literal; }
 
 	string String() { return Token.Literal; }
+	~IntegerLiteral()
+	{
+
+	}
 };
 
 struct FloatLiteral : Expression {
@@ -147,6 +169,10 @@ struct FloatLiteral : Expression {
 	string TokenLiteral() { return Token.Literal; }
 
 	string String() { return Token.Literal; }
+	~FloatLiteral()
+	{
+
+	}
 };
 
 struct PrefixExpression : Expression {
@@ -170,11 +196,15 @@ struct PrefixExpression : Expression {
 
 		return out;
 	}
+	~PrefixExpression()
+	{
+
+	}
 };
 
 struct InfixExpression : Expression {
 	InfixExpression(Token token, string operator_, std::unique_ptr<Expression>left, std::unique_ptr<Expression>right)
-		: Token(token), Left(std::move(left)) ,Operator(operator_),Right(std::move(right)){}
+		: Token(token), Left(std::move(left)), Operator(operator_), Right(std::move(right)) {}
 	Token Token; // the operator such as + , * ,....
 	std::unique_ptr<Expression> Left;
 	string Operator;
@@ -194,6 +224,10 @@ struct InfixExpression : Expression {
 		out += ")";
 
 		return out;
+	}
+	~InfixExpression()
+	{
+
 	}
 };
 
@@ -216,6 +250,10 @@ struct IndexExpression : Expression {
 		out += "])";
 		return out;
 	}
+	~IndexExpression()
+	{
+
+	}
 };
 
 struct Boolean : Expression {
@@ -228,6 +266,10 @@ struct Boolean : Expression {
 	string TokenLiteral() { return Token.Literal; }
 
 	string String() { return Token.Literal; }
+	~Boolean()
+	{
+
+	}
 };
 
 struct BlockStatement : Statement {
@@ -246,6 +288,7 @@ struct BlockStatement : Statement {
 		}
 		return out;
 	}
+	~BlockStatement() {}
 };
 
 struct IfExpression : Expression {
@@ -274,6 +317,10 @@ struct IfExpression : Expression {
 
 		return out;
 	}
+	~IfExpression()
+	{
+
+	}
 };
 
 struct WhileExpression : Expression {
@@ -294,6 +341,10 @@ struct WhileExpression : Expression {
 		out += ") ";
 		out += Body->String();
 		return out;
+	}
+	~WhileExpression()
+	{
+
 	}
 };
 // i32 ident() {
@@ -329,6 +380,10 @@ struct FunctionLiteral : Statement {
 		out += Body->String();
 		return out;
 	}
+	~FunctionLiteral()
+	{
+
+	}
 };
 
 struct CallExpression : Expression {
@@ -360,6 +415,10 @@ struct CallExpression : Expression {
 		out += ")";
 		return out;
 	}
+	~CallExpression()
+	{
+
+	}
 };
 
 struct StringLiteral : Expression {
@@ -372,6 +431,10 @@ struct StringLiteral : Expression {
 	string TokenLiteral() { return Token.Literal; }
 
 	string String() { return Token.Literal; }
+	~StringLiteral()
+	{
+
+	}
 };
 
 struct ArrayLiteral : Expression {
@@ -396,6 +459,10 @@ struct ArrayLiteral : Expression {
 		}
 		out += "]";
 		return out;
+	}
+	~ArrayLiteral()
+	{
+
 	}
 };
 
@@ -422,5 +489,9 @@ struct HashLiteral : Expression {
 		}
 		out += "}";
 		return out;
+	}
+	~HashLiteral()
+	{
+
 	}
 };

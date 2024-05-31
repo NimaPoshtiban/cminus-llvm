@@ -156,6 +156,13 @@ private:
 			{
 				return val;
 			}
+			if (stmt->Token.Type.compare(MUT) == 0)
+			{
+				auto MutBinding = env->lookup(stmt->Name->Value);
+				return builder->CreateStore(val,MutBinding);
+				
+			}
+
 			auto letBinding = allocateVariable(stmt->Name->Value, val->getType(), env);
 			builder->CreateStore(val, letBinding);
 			return val;
@@ -227,7 +234,7 @@ private:
 		if (dynamic_cast<Identifier*>(node.get()) != nullptr)
 		{
 			llvm::Value* result = evalIdentifier(node, env);
-			return builder->CreateRet(result);
+			return result;
 		}
 		if (dynamic_cast<IntegerLiteral*>(node.get()) != nullptr) {
 			auto number = dynamic_cast<IntegerLiteral*>(node.get());
@@ -422,7 +429,7 @@ private:
 		// local variable
 		if (auto localValue = dyn_cast<llvm::AllocaInst>(value))
 		{
-			builder->CreateLoad(localValue->getAllocatedType(), localValue, ident->Value.c_str());
+			 return builder->CreateLoad(localValue->getAllocatedType(), localValue, ident->Value.c_str());
 		}
 
 		// global variable

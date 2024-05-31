@@ -8,26 +8,20 @@ declare i32 @printf(ptr, ...)
 define i64 @main() {
 entry:
   %version = load i32, ptr @version, align 4
-  ret i32 %version
-  ret void <badref>
   %b = alloca i32, align 4
   store i32 121, ptr %b, align 4
   %salary = alloca double, align 8
   store double add (double 0x40B38820C0000000, double 0x3FBEB851E0000000), ptr %salary, align 8
   %nima = alloca i32, align 4
   store i32 -112, ptr %nima, align 4
-  %nima1 = alloca i32, align 4
-  store i32 12, ptr %nima1, align 4
-  %nima2 = load i32, ptr %nima1, align 4
-  ret ptr %nima1
-  ret void <badref>
+  %salary1 = load double, ptr %salary, align 8
+  %nima2 = alloca i32, align 4
+  store i32 12, ptr %nima2, align 4
   %b3 = load i32, ptr %b, align 4
-  ret ptr %b
-  %0 = fcmp oeq void <badref>, i32 121
+  %0 = icmp eq i32 %b3, 121
   br i1 %0, label %consequence, label %else4
   %result = alloca i1, align 1
   %result5 = alloca i1, align 1
-  %a = alloca i32, align 4
 
 consequence:                                      ; preds = %entry
   store i1 true, ptr %result, align 1
@@ -42,13 +36,17 @@ end6:                                             ; preds = %else4, %consequence
   br label %condition
 
 condition:                                        ; preds = %body8, %end6
-  br i1 true, label %body8, label %end79
+  %b7 = load i32, ptr %b, align 4
+  %1 = icmp sgt i32 %b7, 3
+  br i1 %1, label %body8, label %end10
 
 body8:                                            ; preds = %condition
-  store i32 2, ptr %a, align 4
+  %b9 = load i32, ptr %b, align 4
+  %2 = sub i32 %b9, 1
+  store i32 %2, ptr %b, align 4
   br label %condition
 
-end79:                                            ; preds = %condition
+end10:                                            ; preds = %condition
 }
 
 define i1 @hi(i32 %age, i64 %salary, ...) {

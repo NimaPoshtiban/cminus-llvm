@@ -116,7 +116,7 @@ private:
 		{
 			return parseFunctionLiteral();
 		}
-		if (curToken.Type.compare(LET) == 0) {
+		if (curToken.Type.compare(LET) == 0 || curToken.Type.compare(MUT)==0) {
 			return parseLetStatement();
 		}
 		else if (curToken.Type.compare(RETURN) == 0) {
@@ -145,6 +145,7 @@ private:
 		}
 		return std::move(statement);
 	}
+
 	std::unique_ptr<ReturnStatement> parseReturnStatment() {
 		auto stmt = std::make_unique<ReturnStatement>(curToken);
 		nextToken();

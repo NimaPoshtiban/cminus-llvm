@@ -33,7 +33,7 @@ public:
      * if the variable is not defined.
      */
     llvm::Value* lookup(const std::string& name) {
-        return resolve(name);
+        return resolve(name)->record_[name];
     }
 
 private:
@@ -41,14 +41,16 @@ private:
      * Returns specific environment in which a variable is defined, or
      * throws if a variable is not defined.
      */
-    llvm::Value* resolve(const std::string& name) {
-        auto obj = record_.find(name);
-        if (obj == record_.end() && parent_!=nullptr)
+    std::shared_ptr<Environment> resolve(const std::string& name) {
+        if (record_.count(name)!=0)
         {
-            auto obj_ = parent_->lookup(name);
-            obj->second = obj_;
+            return shared_from_this();
         }
-        return obj->second;
+        if (parent_==nullptr)
+        {
+            exit(EXIT_FAILURE);
+        }
+        return parent_->resolve(name);
     }
 
     /**
