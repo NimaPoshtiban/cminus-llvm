@@ -9,7 +9,7 @@ int main() {
 	let nima = -112;
 	{
 		let nima = 12;
-		nima
+		return nima
 	}
 	if(b==121){
 	  let result = true;

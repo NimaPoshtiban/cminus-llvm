@@ -9,6 +9,7 @@ define i64 @main() {
 entry:
   %version = load i32, ptr @version, align 4
   ret i32 %version
+  ret void <badref>
   %b = alloca i32, align 4
   store i32 121, ptr %b, align 4
   %salary = alloca double, align 8
@@ -19,6 +20,7 @@ entry:
   store i32 12, ptr %nima1, align 4
   %nima2 = load i32, ptr %nima1, align 4
   ret ptr %nima1
+  ret void <badref>
   %b3 = load i32, ptr %b, align 4
   ret ptr %b
   %0 = fcmp oeq void <badref>, i32 121

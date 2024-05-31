@@ -142,6 +142,13 @@ private:
 			auto str = dynamic_cast<StringLiteral*>(node.get());
 			return builder->CreateGlobalString(str->Value);
 		}
+		if (dynamic_cast<ReturnStatement*>(node.get()) != nullptr)
+		{
+			auto rt = dynamic_cast<ReturnStatement*>(node.get());
+			auto val = eval(std::move(rt->ReturnValue), env);
+			builder->CreateRet(val);
+		}
+
 		if (dynamic_cast<LetStatement*>(node.get()) != nullptr) {
 			auto stmt = dynamic_cast<LetStatement*>(node.get());
 			auto val = eval(std::move(stmt->Value), env);
