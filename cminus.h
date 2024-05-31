@@ -50,6 +50,32 @@ private:
 			auto expr = dynamic_cast<ExpressionStatement*>(node.get());
 			return eval(std::move(expr->Expression), env);
 		}
+		if (dynamic_cast<WhileExpression*>(node.get()) != nullptr)
+		{
+			auto expr = dynamic_cast<WhileExpression*>(node.get());
+			auto conditionBlcok = createBB("condition", fn);
+			builder->CreateBr(conditionBlcok);
+
+			auto bodyBlock = createBB("body", fn);
+			auto loopendBlock = createBB("end", fn);
+
+			builder->SetInsertPoint(conditionBlcok);
+			auto cond = eval(std::move(expr->Condition), env);
+			if (cond == nullptr)
+			{
+				return nullptr;
+			}
+			builder->CreateCondBr(cond, bodyBlock, loopendBlock);
+			fn->insert(fn->end(), bodyBlock);
+			builder->SetInsertPoint(bodyBlock);
+			eval(std::move(expr->Body), env);
+			builder->CreateBr(conditionBlcok);
+
+			fn->insert(fn->end(), loopendBlock);
+			builder->SetInsertPoint(loopendBlock);
+
+			return builder->getInt32(0);
+		}
 		if (dynamic_cast<BlockStatement*>(node.get()) != nullptr)
 		{
 			auto block = dynamic_cast<BlockStatement*>(node.get());

@@ -18,6 +18,10 @@ int main() {
       let result = false;
 	}
 	
+	while(true){
+	  let a = 2;
+	}
+
 	i1 hi(i32 age,i64 salary){
 	
     }
