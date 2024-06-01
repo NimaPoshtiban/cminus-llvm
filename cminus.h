@@ -159,16 +159,14 @@ private:
 			if (stmt->Token.Type.compare(MUT) == 0)
 			{
 				auto MutBinding = env->lookup(stmt->Name->Value);
-				return builder->CreateStore(val,MutBinding);
-				
+				return builder->CreateStore(val, MutBinding);
+
 			}
 
 			auto letBinding = allocateVariable(stmt->Name->Value, val->getType(), env);
 			builder->CreateStore(val, letBinding);
 			return val;
 		}
-
-		// implement function body 
 		if (dynamic_cast<FunctionLiteral*>(node.get()) != nullptr)
 		{
 			auto fnLiteral = (dynamic_cast<FunctionLiteral*>(node.get()));
@@ -215,8 +213,17 @@ private:
 			{
 				fnType = llvm::FunctionType::get(builder->getDoubleTy(), v, true);
 			}
+			auto prevFn = fn;
+			auto prevBlock = builder->GetInsertBlock();
+
 			auto function = createFunction(fnLiteral->ident.Literal, fnType, env);
-			setFunctionArgs(function, names);
+			auto fnEnv = setFunctionArgs(function, names, env); // function environment
+			fn = function;
+
+			// restore the previous fn location
+			builder->CreateRet(eval(std::move(body), fnEnv));
+			builder->SetInsertPoint(prevBlock);
+			fn = prevFn;
 
 			return function;
 		}
@@ -314,11 +321,17 @@ private:
 	/*
 	* set the names of the function arguments
 	*/
-	void setFunctionArgs(llvm::Function* fn, std::vector<std::string> fnArgs) {
+	std::shared_ptr<Environment> setFunctionArgs(llvm::Function* fn, std::vector<std::string> fnArgs, std::shared_ptr<Environment> env) {
+		auto fnEnv = std::make_shared<Environment>(std::map<std::string, llvm::Value*>{}, env);
+
+
 		unsigned Idx = 0;
 		for (auto& arg : fn->args()) {
+			auto argBinding = allocateVariable(fnArgs[Idx], arg.getType(), fnEnv);
 			arg.setName(fnArgs[Idx++]);
+			builder->CreateStore(&arg, argBinding);
 		}
+		return fnEnv;
 	}
 	/**
 	* Creates function prototype (defines the function, but not the body)
@@ -429,7 +442,7 @@ private:
 		// local variable
 		if (auto localValue = dyn_cast<llvm::AllocaInst>(value))
 		{
-			 return builder->CreateLoad(localValue->getAllocatedType(), localValue, ident->Value.c_str());
+			return builder->CreateLoad(localValue->getAllocatedType(), localValue, ident->Value.c_str());
 		}
 
 		// global variable

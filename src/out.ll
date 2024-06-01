@@ -22,6 +22,8 @@ entry:
   br i1 %0, label %consequence, label %else4
   %result = alloca i1, align 1
   %result5 = alloca i1, align 1
+  %age = alloca i32, align 4
+  %salary12 = alloca i64, align 8
 
 consequence:                                      ; preds = %entry
   store i1 true, ptr %result, align 1
@@ -35,20 +37,26 @@ end6:                                             ; preds = %else4, %consequence
   %tmpif = phi i1 [ true, %consequence ], [ false, %else4 ]
   br label %condition
 
-condition:                                        ; preds = %body8, %end6
-  %b7 = load i32, ptr %b, align 4
-  %1 = icmp sgt i32 %b7, 3
-  br i1 %1, label %body8, label %end10
+condition:                                        ; preds = %body9, %end6
+  %b8 = load i32, ptr %b, align 4
+  %1 = icmp sgt i32 %b8, 3
+  br i1 %1, label %body9, label %end711
 
-body8:                                            ; preds = %condition
-  %b9 = load i32, ptr %b, align 4
-  %2 = sub i32 %b9, 1
+body9:                                            ; preds = %condition
+  %b10 = load i32, ptr %b, align 4
+  %2 = sub i32 %b10, 1
   store i32 %2, ptr %b, align 4
   br label %condition
 
-end10:                                            ; preds = %condition
+end711:                                           ; preds = %condition
 }
 
 define i1 @hi(i32 %age, i64 %salary, ...) {
 entry:
+  store i32 %age, ptr %age, align 4
+  store i64 %salary, ptr %salary12, align 4
+  %age1 = load i32, ptr %age, align 4
+  %0 = add i32 %age1, 2
+  store i32 %0, ptr %age, align 4
+  ret i1 false
 }

@@ -23,7 +23,8 @@ int main() {
 	}
 
 	i1 hi(i32 age,i64 salary){
-	
+		mut age = age + 2;
+		 false
     }
 
 )";
