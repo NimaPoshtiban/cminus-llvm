@@ -49,6 +49,8 @@ body9:                                            ; preds = %condition
   br label %condition
 
 end711:                                           ; preds = %condition
+  %3 = call i1 (i32, i64, ...) @hi(i32 113, i32 21)
+  store i1 %3, ptr %b, align 1
 }
 
 define i1 @hi(i32 %age, i64 %salary, ...) {

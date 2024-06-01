@@ -27,6 +27,8 @@ int main() {
 		 false
     }
 
+	mut b = hi(113,21);
+
 )";
 	Cminus cm{ program };
 	cm.exec();

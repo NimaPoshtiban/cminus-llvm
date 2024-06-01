@@ -227,7 +227,6 @@ private:
 
 			return function;
 		}
-		// implement this
 		if (dynamic_cast<CallExpression*>(node.get()) != nullptr)
 		{
 			auto fn = dynamic_cast<CallExpression*>(node.get());
@@ -236,6 +235,15 @@ private:
 			{
 				return function;
 			}
+			std::vector<llvm::Value*> args{};
+
+			for (auto& a : fn->Arguments) {
+				auto arg = eval(std::move(a), env);
+				args.push_back(arg);
+			}
+
+			auto func = (llvm::Function*)function;
+			return builder->CreateCall(func,args);
 
 		}
 		if (dynamic_cast<Identifier*>(node.get()) != nullptr)
