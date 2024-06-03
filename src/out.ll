@@ -17,9 +17,21 @@ entry:
   %salary1 = load double, ptr %salary, align 8
   %nima2 = alloca i32, align 4
   store i32 12, ptr %nima2, align 4
+  %arrayAlloc = alloca [4 x i32], align 4
+  %0 = getelementptr [4 x i32], ptr %arrayAlloc, i32 0, i32 0
+  store i32 1, ptr %0, align 4
+  %1 = getelementptr [4 x i32], ptr %arrayAlloc, i32 0, i32 1
+  store i32 12, ptr %1, align 4
+  %2 = getelementptr [4 x i32], ptr %arrayAlloc, i32 0, i32 2
+  store i32 23, ptr %2, align 4
+  %3 = getelementptr [4 x i32], ptr %arrayAlloc, i32 0, i32 3
+  store i32 43, ptr %3, align 4
+  %4 = getelementptr [4 x i32], ptr %arrayAlloc, i32 0, i32 0
+  %numbers = alloca ptr, align 8
+  store ptr %4, ptr %numbers, align 8
   %b3 = load i32, ptr %b, align 4
-  %0 = icmp eq i32 %b3, 121
-  br i1 %0, label %consequence, label %else4
+  %5 = icmp eq i32 %b3, 121
+  br i1 %5, label %consequence, label %else4
   %result = alloca i1, align 1
   %result5 = alloca i1, align 1
   %age = alloca i32, align 4
@@ -39,18 +51,18 @@ end6:                                             ; preds = %else4, %consequence
 
 condition:                                        ; preds = %body9, %end6
   %b8 = load i32, ptr %b, align 4
-  %1 = icmp sgt i32 %b8, 3
-  br i1 %1, label %body9, label %end711
+  %6 = icmp sgt i32 %b8, 3
+  br i1 %6, label %body9, label %end711
 
 body9:                                            ; preds = %condition
   %b10 = load i32, ptr %b, align 4
-  %2 = sub i32 %b10, 1
-  store i32 %2, ptr %b, align 4
+  %7 = sub i32 %b10, 1
+  store i32 %7, ptr %b, align 4
   br label %condition
 
 end711:                                           ; preds = %condition
-  %3 = call i1 (i32, i64, ...) @hi(i32 113, i32 21)
-  store i1 %3, ptr %b, align 1
+  %8 = call i1 (i32, i64, ...) @hi(i32 113, i32 21)
+  store i1 %8, ptr %b, align 1
 }
 
 define i1 @hi(i32 %age, i64 %salary, ...) {

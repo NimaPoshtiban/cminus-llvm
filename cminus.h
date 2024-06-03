@@ -296,6 +296,28 @@ private:
 			}
 			return evalInfixExpression(infix->Operator, left, right);
 		}
+		if (dynamic_cast<ArrayLiteral*>(node.get())!=nullptr)
+		{
+			auto arr = dynamic_cast<ArrayLiteral*>(node.get());
+			auto result = vector<llvm::Value*>();
+			for (auto& exp : arr->Elements) {
+				auto evaluated = eval(std::move( exp), env);
+				if (evaluated == nullptr)
+				{
+					return evaluated;
+				}
+				result.push_back(evaluated);
+			}
+			// the first element of the array determines the array type
+			llvm::ArrayType* arrType = llvm::ArrayType::get(result[0]->getType(), result.size());
+			llvm::Value* arrayAlloc = builder->CreateAlloca(arrType, nullptr, "arrayAlloc");
+			for (int i = 0; i < result.size();i++) {
+				llvm::Value* idx = llvm::ConstantInt::get(llvm::Type::getInt32Ty(*ctx), i);
+				llvm::Value* elemPtr = builder->CreateGEP(arrType,arrayAlloc,{builder->getInt32(0), idx });
+				builder->CreateStore(result[i], elemPtr);
+			}
+			return builder->CreateGEP(arrType, arrayAlloc, { builder->getInt32(0), builder->getInt32(0) });
+		}
 		return builder->getInt32(0);
 	}
 

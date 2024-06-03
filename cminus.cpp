@@ -11,6 +11,7 @@ int main() {
 		mut salary = salary + 20;
 		let nima = 12;
 	}
+	let numbers = [1,12,23,43];
 	if(b==121){
 	  let result = true;
 	  

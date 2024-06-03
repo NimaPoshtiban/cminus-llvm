@@ -16,7 +16,6 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\cminus.h" />
-    <ClInclude Include="Object.h" />
     <ClInclude Include="Environment.h" />
   </ItemGroup>
   <ItemGroup>

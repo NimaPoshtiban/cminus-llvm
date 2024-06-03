@@ -315,7 +315,6 @@ if %errorlevel% neq 0 goto :VCEnd</Command>
     <ClInclude Include="C:\Users\nima\tmp\cpp\cminus\lexer.h" />
     <ClInclude Include="C:\Users\nima\tmp\cpp\cminus\ast.h" />
     <ClInclude Include="Environment.h" />
-    <ClInclude Include="Object.h" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="C:\Users\nima\tmp\cpp\cminus\build\ZERO_CHECK.vcxproj">
