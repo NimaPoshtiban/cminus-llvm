@@ -484,7 +484,51 @@ private:
 	}
 
 	llvm::Value* evalInfixExpression(const std::string& op, llvm::Value* left, llvm::Value* right) {
-		if (left->getType()->isIntegerTy() == right->getType()->isIntegerTy())
+		// float operations
+		if (left->getType()->isFloatingPointTy() && right->getType()->isFloatingPointTy())
+		{
+			if (op.compare("+") == 0)
+			{
+				return builder->CreateFAdd(left, right);
+			}
+			if (op.compare("-") == 0)
+			{
+				return builder->CreateFSub(left, right);
+			}
+			if (op.compare("*") == 0)
+			{
+				return builder->CreateFMul(left, right);
+			}
+			if (op.compare("/") == 0)
+			{
+				return builder->CreateFDiv(left, right);
+			}
+			if (op.compare("<") == 0)
+			{
+				return builder->CreateFCmpOLT(left, right);
+			}
+			if (op.compare(">") == 0)
+			{
+				return builder->CreateFCmpOGT(left, right);
+			}
+			if (op.compare("==") == 0)
+			{
+				return builder->CreateFCmpOEQ(left, right);
+			}
+			if (op.compare("!=") == 0)
+			{
+				return builder->CreateFCmpONE(left, right);
+			}
+			if (op.compare(">=") == 0)
+			{
+				return builder->CreateFCmpOGE(left, right);
+			}
+			if (op.compare("<=") == 0)
+			{
+				return builder->CreateFCmpOLE(left, right);
+			}
+		}
+		if (left->getType()->isIntegerTy() && right->getType()->isIntegerTy())
 		{
 
 			if (op.compare("+") == 0)
@@ -538,50 +582,6 @@ private:
 			if (op.compare("<=") == 0)
 			{
 				return builder->CreateICmpSLE(left, right);
-			}
-		}
-		// float operations
-		if (left->getType()->isFloatingPointTy() == right->getType()->isFloatingPointTy())
-		{
-			if (op.compare("+") == 0)
-			{
-				return builder->CreateFAdd(left, right);
-			}
-			if (op.compare("-") == 0)
-			{
-				return builder->CreateFSub(left, right);
-			}
-			if (op.compare("*") == 0)
-			{
-				return builder->CreateFMul(left, right);
-			}
-			if (op.compare("/") == 0)
-			{
-				return builder->CreateFDiv(left, right);
-			}
-			if (op.compare("<") == 0)
-			{
-				return builder->CreateFCmpOLT(left, right);
-			}
-			if (op.compare(">") == 0)
-			{
-				return builder->CreateFCmpOGT(left, right);
-			}
-			if (op.compare("==") == 0)
-			{
-				return builder->CreateFCmpOEQ(left, right);
-			}
-			if (op.compare("!=") == 0)
-			{
-				return builder->CreateFCmpONE(left, right);
-			}
-			if (op.compare(">=") == 0)
-			{
-				return builder->CreateFCmpOGE(left, right);
-			}
-			if (op.compare("<=") == 0)
-			{
-				return builder->CreateFCmpOLE(left, right);
 			}
 		}
 

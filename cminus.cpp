@@ -8,7 +8,7 @@ int main() {
 	let salary = 5000.128 + 0.12
 	let nima = -112;
 	{
-		mut salary = salary + 20;
+		mut salary = salary + 20.2;
 		let nima = 12;
 	}
 	let numbers = [1,12,23,43];
@@ -18,7 +18,7 @@ int main() {
 	}else{
       let result = false;
 	}
-	
+
 	while(b > 3){
 	  mut b = b-1
 	}
@@ -29,7 +29,7 @@ int main() {
     }
 
 	mut b = hi(113,21);
-
+	}
 )";
 	Cminus cm{ program };
 	cm.exec();
